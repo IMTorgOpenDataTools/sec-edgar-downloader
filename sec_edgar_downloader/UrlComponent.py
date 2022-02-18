@@ -2,17 +2,24 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 import numpy as np
-from faker import Faker
 from typing import ClassVar, Dict, List, Optional, Tuple, Union
 
 #from ._utils import generate_random_user_agent
+from ._constants import (
+    FilingMetadata,
+    get_number_of_unique_filings,
+    generate_random_user_agent,
+    is_cik,
+    DATE_FORMAT_TOKENS,
+    FILING_DETAILS_FILENAME_STEM,
+    FILING_FULL_SUBMISSION_FILENAME,
+    MAX_RETRIES,
+    ROOT_SAVE_FOLDER_NAME,
+    SEC_EDGAR_ARCHIVES_BASE_URL,
+    SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL,
+    SEC_EDGAR_SEARCH_API_ENDPOINT,
+)
 
-
-# Object for generating fake user-agent strings
-fake = Faker()
-
-def generate_random_user_agent() -> str:
-    return f"{fake.first_name()} {fake.last_name()} {fake.email()}"
 
 
 
@@ -98,12 +105,19 @@ class Filing:
     __url_filing_detail_page: str = 'https://www.sec.gov/Archives/edgar/data/{}/{}/{}-index.htm'
     __url_filing_document: str = 'https://www.sec.gov/Archives/edgar/data/{}/{}/{}'
 
+    _url_doc_types = {'ixbrl':None, 
+                        'ex_htm':[None], 
+                        'xbrl':None, 
+                        'zip':None, 
+                        'text':None,
+                        'xlsx':None
+                        }
+
     def __init__(self, short_cik:str, file_type:str, year:str) -> None:
         self.short_cik = short_cik
         self.file_type = file_type
         self.year = year
         self.accession_number = None
-        self._url_doc_types = {}
 
         try:
             self.accession_number = self.get_accession_number()
@@ -121,6 +135,7 @@ class Filing:
 
 
     def _get_details(accession_number: AccessionNumber) -> Tuple[str, str, str]:
+        #TODO: create algorithm (accession to cik,file_type,year) to get the actual data
         short_cik='51143'
         file_type='10-Q'
         year='2021'

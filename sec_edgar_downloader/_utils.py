@@ -1,6 +1,6 @@
 """Utility functions for the downloader class."""
 import time
-from collections import namedtuple
+
 from datetime import datetime
 from pathlib import Path
 from typing import List
@@ -8,11 +8,14 @@ from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
-from faker import Faker
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from ._constants import (
+    FilingMetadata,
+    get_number_of_unique_filings,
+    generate_random_user_agent,
+    is_cik,
     DATE_FORMAT_TOKENS,
     FILING_DETAILS_FILENAME_STEM,
     FILING_FULL_SUBMISSION_FILENAME,
@@ -22,28 +25,14 @@ from ._constants import (
     SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL,
     SEC_EDGAR_SEARCH_API_ENDPOINT,
 )
-from .UrlComponent import Filing
+
+
 
 
 class EdgarSearchApiError(Exception):
     """Error raised when Edgar Search API encounters a problem."""
 
 
-# Object for storing metadata about filings that will be downloaded.
-FilingMetadata = namedtuple(
-    "FilingMetadata",
-    [
-        "accession_number",
-        "full_submission_url",      #txt
-        "filing_details_url",       #htm
-        "filing_details_filename",
-
-        #TODO: add additional urls
-    ],
-)
-
-# Object for generating fake user-agent strings
-fake = Faker()
 
 # Specify max number of request retries
 # https://stackoverflow.com/a/35504626/3820660
@@ -52,6 +41,7 @@ retries = Retry(
     backoff_factor=SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL,
     status_forcelist=[403, 500, 502, 503, 504],
 )
+
 
 
 def validate_date_format(date_format: str) -> None:
@@ -339,19 +329,3 @@ def download_filings(
                     )
     finally:
         client.close()
-
-
-def get_number_of_unique_filings(filings: List[FilingMetadata]) -> int:
-    return len({metadata.accession_number for metadata in filings})
-
-
-def generate_random_user_agent() -> str:
-    return f"{fake.first_name()} {fake.last_name()} {fake.email()}"
-
-
-def is_cik(ticker_or_cik: str) -> bool:
-    try:
-        int(ticker_or_cik)
-        return True
-    except ValueError:
-        return False

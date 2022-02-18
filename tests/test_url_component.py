@@ -23,7 +23,7 @@ def test_acc_get_nodash_number():
 
 
 # Filing
-FORM_TYPE = '10-K'    #TODO:expand to others
+FORM_TYPE = '10-K'    #TODO:expand to other file_types
 
 def test_filing():
     number = '0001628280-16-020309'

@@ -172,6 +172,10 @@ class Downloader:
             query,
         )
 
+        #TODO:steps
+        #add urls that should be gotten to FilingMetadata
+        #run this, then check results for missing urls
+        #for urls that are missing, creating Filing and populate data
         filings_to_fetch = get_filing_urls_to_download(
             filing,
             ticker_or_cik,

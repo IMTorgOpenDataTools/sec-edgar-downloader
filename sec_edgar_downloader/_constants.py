@@ -1,6 +1,44 @@
 """Constants used throughout the package."""
-
 from datetime import date
+from collections import namedtuple
+from typing import List
+from faker import Faker
+
+
+# Object for storing metadata about filings that will be downloaded.
+FilingMetadata = namedtuple(
+    "FilingMetadata",
+    [
+        "accession_number",
+        "full_submission_url",      #text
+        "filing_details_url",       #htm(ixbrl)
+        "filing_details_filename",
+
+        #TODO: add additional urls
+    ],
+)
+
+def get_number_of_unique_filings(filings: List[FilingMetadata]) -> int:
+    return len({metadata.accession_number for metadata in filings})
+
+# Object for generating fake user-agent strings
+fake = Faker()
+def generate_random_user_agent() -> str:
+    return f"{fake.first_name()} {fake.last_name()} {fake.email()}"
+
+def is_cik(ticker_or_cik: str) -> bool:
+    try:
+        int(ticker_or_cik)
+        return True
+    except ValueError:
+        return False
+
+
+
+
+
+
+
 
 SEC_EDGAR_SEARCH_API_ENDPOINT = "https://efts.sec.gov/LATEST/search-index"
 SEC_EDGAR_ARCHIVES_BASE_URL = "https://www.sec.gov/Archives/edgar/data"
