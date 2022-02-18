@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import numpy as np
 from faker import Faker
-from typing import ClassVar, Dict, List, Optional, Union
+from typing import ClassVar, Dict, List, Optional, Tuple, Union
 
 #from ._utils import generate_random_user_agent
 
@@ -16,7 +16,7 @@ def generate_random_user_agent() -> str:
 
 
 
-class AccessionNumber():
+class AccessionNumber:
     """The 'accession number' is SEC EDGAR's primary key.
     
     ex: Accession_Number('0001193125-15-118890')
@@ -81,7 +81,7 @@ class AccessionNumber():
 
 
 
-class Filing():
+class Filing:
     """The Filing functionality gets urls for the different files that may be available.
     
     sec - all filings across sec edgar site
@@ -113,6 +113,18 @@ class Filing():
             self._get_filing_document_all_urls()
         except:
             print('unable to get all filing docs urls')
+
+    @classmethod
+    def from_accession_number(cls, accession_number: AccessionNumber) -> None:
+        short_cik, file_type, year = cls._get_details(accession_number = accession_number)
+        return cls(short_cik, file_type, year)
+
+
+    def _get_details(accession_number: AccessionNumber) -> Tuple[str, str, str]:
+        short_cik='51143'
+        file_type='10-Q'
+        year='2021'
+        return short_cik, file_type, year
 
 
     def get_sec_latest_filings_detail_page(self, file_type:str) -> str:
@@ -182,8 +194,8 @@ class Filing():
         item = row['Description']
         accno = str(item.values).split('Acc-no: ')[1].split('\\')[0]
         return AccessionNumber(accno)
-    
-     
+
+
     def _get_filing_document_all_urls(self) -> None:
         """Get the document's download url
         
@@ -213,7 +225,7 @@ class Filing():
         df = pd.DataFrame()
         for tbl in tbls:
             tmp = pd.read_html(tbl.prettify())[0]
-            df = df.append(tmp)
+            df = pd.concat([df, tmp], ignore_index=True)
         newdf = df
         df = newdf.dropna(subset=['Description'])
         

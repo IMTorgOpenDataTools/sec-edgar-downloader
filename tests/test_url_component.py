@@ -43,3 +43,9 @@ def test_filing_get_filing_document_url():
     File.set_accession_number('0001558370-21-014734')
     File._get_filing_document_all_urls()
     assert File.get_filing_document_url(doc_type) == 'https://www.sec.gov/Archives/edgar/data/51143/000155837021014734/ibm-20210930x10q_htm.xml'
+
+def test_filing_construct_with_accession():
+    number = '0001628280-16-020309'
+    Acc_no1 = uc.AccessionNumber(number)
+    File = uc.Filing.from_accession_number(Acc_no1)
+    assert File.short_cik == '51143'

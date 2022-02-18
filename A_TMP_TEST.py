@@ -9,10 +9,6 @@ from sec_edgar_downloader._constants import SUPPORTED_FILINGS, DATE_FORMAT_TOKEN
 
 
 
-def test_constructor_relative_path():
-    dl = Downloader("./Downloads")
-    expected = Path.cwd() / "Downloads"
-    assert dl.download_folder == expected
 
 def test_get_urls():
     # SEC Edgar Search fails to retrieve Apple 8-Ks after 2000 and before 2002
@@ -38,6 +34,4 @@ def test_get_urls():
 
 
 
-
-test_constructor_relative_path()
 test_get_urls()
