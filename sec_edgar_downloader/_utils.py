@@ -22,6 +22,7 @@ from ._constants import (
     SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL,
     SEC_EDGAR_SEARCH_API_ENDPOINT,
 )
+from .UrlComponent import Filing
 
 
 class EdgarSearchApiError(Exception):
@@ -33,9 +34,11 @@ FilingMetadata = namedtuple(
     "FilingMetadata",
     [
         "accession_number",
-        "full_submission_url",
-        "filing_details_url",
+        "full_submission_url",      #txt
+        "filing_details_url",       #htm
         "filing_details_filename",
+
+        #TODO: add additional urls
     ],
 )
 
@@ -127,6 +130,42 @@ def build_filing_metadata_from_hit(hit: dict) -> FilingMetadata:
     )
 
 
+def request_standard_url(payload, headers):
+    client = requests.Session()
+    client.mount("http://", HTTPAdapter(max_retries=retries))
+    client.mount("https://", HTTPAdapter(max_retries=retries))
+
+    try:
+        resp = client.post(SEC_EDGAR_SEARCH_API_ENDPOINT, json=payload, headers=headers)
+        resp.raise_for_status()
+        search_query_results = resp.json()
+
+        if "error" in search_query_results:
+            try:
+                root_cause = search_query_results["error"]["root_cause"]
+                if not root_cause:  # pragma: no cover
+                    raise ValueError
+
+                error_reason = root_cause[0]["reason"]
+                raise EdgarSearchApiError(
+                    f"Edgar Search API encountered an error: {error_reason}. "
+                    f"Request payload:\n{payload}"
+                )
+            except (ValueError, KeyError):  # pragma: no cover
+                raise EdgarSearchApiError(
+                    "Edgar Search API encountered an unknown error. "
+                    f"Request payload:\n{payload}"
+                ) from None
+    finally:
+        client.close()
+    return search_query_results
+
+
+def request_scrape_detail_page():
+    pass
+
+
+ 
 def get_filing_urls_to_download(
     filing_type: str,
     ticker_or_cik: str,
@@ -139,9 +178,7 @@ def get_filing_urls_to_download(
     filings_to_fetch: List[FilingMetadata] = []
     start_index = 0
 
-    client = requests.Session()
-    client.mount("http://", HTTPAdapter(max_retries=retries))
-    client.mount("https://", HTTPAdapter(max_retries=retries))
+
     try:
         while len(filings_to_fetch) < num_filings_to_download:
             payload = form_request_payload(
@@ -157,29 +194,8 @@ def get_filing_urls_to_download(
                 "Accept-Encoding": "gzip, deflate",
                 "Host": "efts.sec.gov",
             }
-            resp = client.post(
-                SEC_EDGAR_SEARCH_API_ENDPOINT, json=payload, headers=headers
-            )
-            resp.raise_for_status()
-            search_query_results = resp.json()
-
-            if "error" in search_query_results:
-                try:
-                    root_cause = search_query_results["error"]["root_cause"]
-                    if not root_cause:  # pragma: no cover
-                        raise ValueError
-
-                    error_reason = root_cause[0]["reason"]
-                    raise EdgarSearchApiError(
-                        f"Edgar Search API encountered an error: {error_reason}. "
-                        f"Request payload:\n{payload}"
-                    )
-                except (ValueError, KeyError):  # pragma: no cover
-                    raise EdgarSearchApiError(
-                        "Edgar Search API encountered an unknown error. "
-                        f"Request payload:\n{payload}"
-                    ) from None
-
+            
+            search_query_results = request_standard_url(payload, headers)
             query_hits = search_query_results["hits"]["hits"]
 
             # No more results to process
@@ -212,7 +228,7 @@ def get_filing_urls_to_download(
             # Prevent rate limiting
             time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)
     finally:
-        client.close()
+        print('all done')
 
     return filings_to_fetch
 

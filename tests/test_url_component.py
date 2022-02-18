@@ -23,17 +23,23 @@ def test_acc_get_nodash_number():
 
 
 # Filing
-File = uc.Filing()
+FORM_TYPE = '10-K'    #TODO:expand to others
 
-def test_filing_get_detail():
-    assert File.get_filing_detail(cik=320193, file_type='10-K', year='2016') == {'short_cik': '1628280', 'year': '2016', 'annual_sequence': '020309'}
+def test_filing():
+    number = '0001628280-16-020309'
+    Acc_no1 = uc.AccessionNumber(number)
+    File = uc.Filing(short_cik=320193, file_type=FORM_TYPE, year='2016')
+    assert File.accession_number.get_accession_number() == Acc_no1.get_accession_number()
+
 
 def test_filing_get_sec_latest_filings():
-    form_type = '10-K'
-    assert len(File.get_sec_latest_filing_detail_page(form_type)) > 0
+    File = uc.Filing(short_cik=320193, file_type=FORM_TYPE, year='2016')
+    assert len(File.get_sec_latest_filings_detail_page(FORM_TYPE)) > 0
+
 
 def test_filing_get_filing_document_url():
+    File = uc.Filing(short_cik='51143', file_type='10-Q', year='2021')
     doc_type = 'xbrl'
-    acc_no = '0001558370-21-014734'
-    short_cik =  '51143'
-    assert File.get_filing_document_url(doc_type, acc_no, short_cik) == 'https://www.sec.gov/Archives/edgar/data/51143/000155837021014734/ibm-20210930x10q_htm.xml'
+    File.set_accession_number('0001558370-21-014734')
+    File._get_filing_document_all_urls()
+    assert File.get_filing_document_url(doc_type) == 'https://www.sec.gov/Archives/edgar/data/51143/000155837021014734/ibm-20210930x10q_htm.xml'
