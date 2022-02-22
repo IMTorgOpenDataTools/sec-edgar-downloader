@@ -8,13 +8,18 @@ from faker import Faker
 # Object for storing metadata about filings that will be downloaded.
 FilingMetadata = namedtuple(
     "FilingMetadata",
-    [
+    [  #original
         "accession_number",
-        "full_submission_url",      #text
-        "filing_details_url",       #htm(ixbrl)
         "filing_details_filename",
-
-        #TODO: add additional urls
+        "full_submission_url",        #text
+        "filing_details_url",         #htm(ixbrl)
+        
+      #added
+        "filing_detail_page_url",
+        "xlsx_financial_report_url",
+        "html_exhibits_url",              #must scrape
+        "xbrl_instance_doc_url",          #must scrape
+        "zip_compressed_file_url"
     ],
 )
 

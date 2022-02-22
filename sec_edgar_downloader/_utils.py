@@ -1,5 +1,6 @@
 """Utility functions for the downloader class."""
 import time
+import re
 
 from datetime import datetime
 from pathlib import Path
@@ -79,16 +80,42 @@ def form_request_payload(
 
 def build_filing_metadata_from_hit(hit: dict) -> FilingMetadata:
     accession_number, filing_details_filename = hit["_id"].split(":", 1)
+    CIK, YY, SEQ = accession_number.split('-')
+
+    period_end = hit['_source']['period_ending'].split('-')
+    period_end_mmdd = period_end[1] + period_end[2]
+    period_end_yyyy = '20' + period_end[0]
+    period_end_yymmdd = period_end[0] + period_end_mmdd
+    period_end_mmddyy = period_end_mmdd + YY
+
+    file_type = '8k'                             #TODO: create for every file type
+    try:
+        text = hit['_source']['display_names'][0]    #TODO: can't assume 0-index
+        tmp = re.findall("\([A-Z]{3,}", text)
+        ticker = tmp[0].replace('(','').replace(')','').lower()
+    except:
+        print(text)
+        print(tmp)
+
     # Company CIK should be last in the CIK list. This list may also include
     # the CIKs of executives carrying out insider transactions like in form 4.
     cik = hit["_source"]["ciks"][-1]
     accession_number_no_dashes = accession_number.replace("-", "", 2)
+    accession_number_short = accession_number.split('-')[0]
 
     submission_base_url = (
         f"{SEC_EDGAR_ARCHIVES_BASE_URL}/{cik}/{accession_number_no_dashes}"
     )
+    cik_short = cik.lstrip('0')
+    submission_base_short_url = (
+        f"{SEC_EDGAR_ARCHIVES_BASE_URL}/{cik_short}/{accession_number_no_dashes}"
+    )
 
     full_submission_url = f"{submission_base_url}/{accession_number}.txt"
+    
+    #route_suffix1 = f"{ticker}-{period_end_mmdd}x{period_end_yyyy}x{file_type}"
+    route_suffix1 = f"{ticker}-{file_type.lower()}_{period_end_mmddyy}"
+    route_suffix2 = f"{accession_number_short}-{YY}-{SEQ}"
 
     # Get XSL if human readable is wanted
     # XSL is required to download the human-readable
@@ -112,11 +139,24 @@ def build_filing_metadata_from_hit(hit: dict) -> FilingMetadata:
         f"{FILING_DETAILS_FILENAME_STEM}{filing_details_filename_extension}"
     )
 
+    filing_detail_page_url = f"{submission_base_short_url}/{accession_number_short}-{period_end[0][2:4]}-{SEQ}-index.htm"
+    xlsx_financial_report_url = f"{submission_base_url}/Financial_Report.xlsx"
+    html_exhibits_url = ""
+    xbrl_instance_doc_url = ""    #f"{submission_base_short_url}/{route_suffix1}_htm.xml"
+    zip_compressed_file_url = f"{submission_base_short_url}/{route_suffix2}-xbrl.zip"
+
+
     return FilingMetadata(
         accession_number=accession_number,
+        filing_details_filename=filing_details_filename,
         full_submission_url=full_submission_url,
         filing_details_url=filing_details_url,
-        filing_details_filename=filing_details_filename,
+
+        filing_detail_page_url=filing_detail_page_url,
+        xlsx_financial_report_url=xlsx_financial_report_url,
+        html_exhibits_url=html_exhibits_url,
+        xbrl_instance_doc_url=xbrl_instance_doc_url,
+        zip_compressed_file_url=zip_compressed_file_url
     )
 
 
