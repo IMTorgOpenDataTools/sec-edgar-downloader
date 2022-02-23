@@ -8,6 +8,7 @@ from typing import ClassVar, Dict, List, Optional, Tuple, Union
 #from ._utils import generate_random_user_agent
 from ._constants import (
     FilingMetadata,
+    DocumentMetadata,
     get_number_of_unique_filings,
     generate_random_user_agent,
     is_cik,
@@ -19,6 +20,7 @@ from ._constants import (
     SEC_EDGAR_ARCHIVES_BASE_URL,
     SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL,
     SEC_EDGAR_SEARCH_API_ENDPOINT,
+    SUPPORTED_FILINGS
 )
 
 
@@ -107,19 +109,13 @@ class Filing:
     __url_filing_detail_page: str = 'https://www.sec.gov/Archives/edgar/data/{}/{}/{}-index.htm'
     __url_filing_document: str = 'https://www.sec.gov/Archives/edgar/data/{}/{}/{}'
 
-    _url_doc_types = {'ixbrl':None, 
-                        'ex_htm':[None], 
-                        'xbrl':None, 
-                        'zip':None, 
-                        'text':None,
-                        'xlsx':None
-                        }
-
     def __init__(self, short_cik:str, file_type:str, year:str) -> None:
         self.short_cik = short_cik
         self.file_type = file_type
         self.year = year
         self.accession_number = None
+        self.documents = []
+        self.filing_metadata = None
 
         try:
             self.accession_number = self.get_accession_number()
@@ -179,9 +175,7 @@ class Filing:
 
 
     def get_accession_number(self) -> AccessionNumber:
-        """Prepare minimum info to access data by taking most-recent filing
-            for a date
-         #TODO: add size, primary document information for reference
+        """Prepare minimum info to access data by taking most-recent filing for a date.
 
         :param cik
         :param file_type
@@ -225,12 +219,6 @@ class Filing:
         :param short_cik
         :return url
         """
-        doc = {'ixbrl': ['10-Q','10-K','8-K'],
-               'xbrl': ['XML'],
-               'text': np.nan,
-               'exhibit': ['EX-99.1']   #TODO:add additional versions 99.2, 99.3, ...
-              }
-        
         headers = {
                 "User-Agent": generate_random_user_agent(),
                 "From": generate_random_user_agent(),
@@ -251,67 +239,50 @@ class Filing:
             df = pd.concat([df, tmp], ignore_index=True)
         newdf = df
         df = newdf.dropna(subset=['Description'])
-        
-        #TODO: clean this up
-        DOC = 'ixbrl'
-        types = doc[DOC]
-        document_name = df[df['Type'].isin(types)]['Document'].values[0].split('  iXBRL')[0]
-        self._url_doc_types[DOC] = self.__url_filing_document.format(self.short_cik, acc_no_noformat, document_name)
 
-        DOC = 'xbrl'
-        types = 'INSTANCE'
-        document_name = df[df['Description'].str.contains(types)]['Document'].values[0]
-        self._url_doc_types[DOC] = self.__url_filing_document.format(self.short_cik, acc_no_noformat, document_name)
+        href = []
+        for tbl in tbls:
+            for a in tbl.find_all('a', href=True):
+                href.append(a['href'])
+        href[0] = href[0].split('/ix?doc=')[1]
+        extension = [ref.split('.')[1] for ref in href]
+        df['URL'] = href
+        df['Extension'] = extension
 
-        DOC = 'zip' 
-        #https://www.sec.gov/Archives/edgar/data/72971/000007297120000230/0000072971-20-000230-xbrl.zip
-        #https://www.sec.gov/Archives/edgar/data/320193/000162828016020309/0001628280-16-020309-xbrl.zip
-        document_name = str(self.accession_number)+'-xbrl.zip'
-        self._url_doc_types[DOC] = self.__url_filing_document.format(self.short_cik, acc_no_noformat, document_name)
+        tmp_list = list(df.itertuples(name='Row', index=False))
+        self.documents.extend( 
+            [ DocumentMetadata(
+                Seq=rec.Seq,
+                Description=rec.Description,
+                Document=rec.Document,
+                Type=rec.Type,
+                Size=rec.Size,
+                URL=rec.URL,
+                Extension=rec.Extension
+                ) for rec in tmp_list ]
+            )
 
-        DOC = 'text'
-        types = doc[DOC]
-        document_name = df[df['Type'].isna()]['Document'].values[0]
-        self._url_doc_types[DOC] = self.__url_filing_document.format(self.short_cik, acc_no_noformat, document_name)
+        base_url = 'https://www.sec.gov'
+        url_ixbrl = base_url + df[df['Type'].isin(SUPPORTED_FILINGS)]['URL'].values[0]
+        url_xbrl = base_url + df[df['Description'].str.contains('INSTANCE')]['URL'].values[0]
+        url_text = base_url + df[df['Extension'].str.contains('txt')]['URL'].values[0]
+        url_zip = self.__url_filing_document.format(self.short_cik, acc_no_noformat, str(self.accession_number)+'-xbrl.zip')
+        url_xlsx = self.__url_filing_document.format(self.short_cik, acc_no_noformat, 'Financial_Report.xlsx')
+        df_tmp = df[df['Type'].isin(['99.1'])]
+        url_exhibit = base_url + df_tmp['URL'].values[0] if df_tmp.shape[0] > 0 else None
 
-        DOC = 'exhibit'
-        types = doc[DOC]
-        df_tmp = df[df['Type'].isin(types)]
-        if df_tmp.shape[0] > 0:
-            document_name = df_tmp['Document'].values[0]
-            self._url_doc_types[DOC] = self.__url_filing_document.format(self.short_cik, acc_no_noformat, document_name)
-        self._url_doc_types[DOC] = ""
-
-        DOC = 'xlsx'
-        document_name = 'Financial_Report.xlsx'
-        self._url_doc_types[DOC] = self.__url_filing_document.format(self.short_cik, acc_no_noformat, document_name)
-        
-        #submission_base_url = (f"{SEC_EDGAR_ARCHIVES_BASE_URL}/{self.short_cik}/{acc_no_noformat}")
-
-        return FilingMetadata(
+        self.filing_metadata = FilingMetadata(
             accession_number = self.accession_number,
             filing_details_filename = '',
-            full_submission_url = self._url_doc_types['text'],
-            filing_details_url = self._url_doc_types['ixbrl'],
-
+            full_submission_url = url_text,
+            filing_details_url = url_ixbrl,
+                
             filing_detail_page_url = filled_url,
-            xlsx_financial_report_url = self._url_doc_types['xlsx'],
-            html_exhibits_url = self._url_doc_types['exhibit'],
-            xbrl_instance_doc_url = self._url_doc_types['xbrl'],
-            zip_compressed_file_url = self._url_doc_types['zip']
-        )
-
-    def get_filing_document_url(self, doc_type: str) -> str:
-        """Get the document's download url
-        
-        :param doc_type 'ixbrl','xbrl','zip','text'
-        :return url
-        """
-        if doc_type in self._url_doc_types.keys():
-            url = self._url_doc_types[doc_type]
-        else:
-            print('there was a problem getting the url')
-        return url
+            xlsx_financial_report_url = url_xlsx,
+            html_exhibits_url = url_exhibit,
+            xbrl_instance_doc_url = url_xbrl,
+            zip_compressed_file_url = url_zip
+            )
 
     def set_accession_number(self, accession_number: str) -> None:
         self.accession_number = AccessionNumber(accession_number)

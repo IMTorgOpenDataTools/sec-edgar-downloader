@@ -23,6 +23,19 @@ FilingMetadata = namedtuple(
     ],
 )
 
+DocumentMetadata = namedtuple(
+    "DocumentMetadata",
+    [
+        "Seq",
+        "Description",
+        "Document",
+        "Type",
+        "Size",
+        "URL",
+        "Extension"
+    ]
+)
+
 def get_number_of_unique_filings(filings: List[FilingMetadata]) -> int:
     return len({metadata.accession_number for metadata in filings})
 
