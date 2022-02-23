@@ -11,6 +11,7 @@ import pytest
 
 from sec_edgar_downloader import Downloader
 from sec_edgar_downloader._constants import SUPPORTED_FILINGS, DATE_FORMAT_TOKENS
+from sec_edgar_downloader._utils import _check_params
 
 
 def test_constructor_no_params():
@@ -65,7 +66,7 @@ def test__check_params():
     num_filings_to_download = 100
 
     dl = Downloader("./Downloads")
-    filing, ticker_or_cik, amount, after, before, included_amends, query = dl._check_params(
+    filing, ticker_or_cik, amount, after, before, included_amends, query = _check_params(
         filing_type,
         ticker,
         num_filings_to_download,

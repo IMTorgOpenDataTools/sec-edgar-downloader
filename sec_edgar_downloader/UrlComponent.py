@@ -201,8 +201,6 @@ class Filing:
             }
         
         filled_url = self.__url_company_search.format(self.short_cik, self.file_type)
-        print(f'query url: {filled_url}')
-        
         edgar_resp = requests.get(filled_url, headers=headers)
         edgar_resp.raise_for_status()
         edgar_str = edgar_resp.text
@@ -278,8 +276,11 @@ class Filing:
 
         DOC = 'exhibit'
         types = doc[DOC]
-        document_name = df[df['Type'].isin(types)]['Document'].values[0]
-        self._url_doc_types[DOC] = self.__url_filing_document.format(self.short_cik, acc_no_noformat, document_name)
+        df_tmp = df[df['Type'].isin(types)]
+        if df_tmp.shape[0] > 0:
+            document_name = df_tmp['Document'].values[0]
+            self._url_doc_types[DOC] = self.__url_filing_document.format(self.short_cik, acc_no_noformat, document_name)
+        self._url_doc_types[DOC] = ""
 
         DOC = 'xlsx'
         document_name = 'Financial_Report.xlsx'

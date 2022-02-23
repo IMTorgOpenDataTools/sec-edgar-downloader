@@ -48,4 +48,4 @@ def test_filing_construct_with_accession():
     number = '0001628280-16-020309'
     Acc_no1 = uc.AccessionNumber(number)
     File = uc.Filing.from_accession_number(Acc_no1)
-    assert File.short_cik == '51143'
+    assert File.short_cik == '320193'

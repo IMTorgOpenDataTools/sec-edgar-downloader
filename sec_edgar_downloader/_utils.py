@@ -86,21 +86,6 @@ def build_filing_metadata_from_hit(hit: dict) -> FilingMetadata:
     accession_number, filing_details_filename = hit["_id"].split(":", 1)
     CIK, YY, SEQ = accession_number.split('-')
 
-    period_end = hit['_source']['period_ending'].split('-')
-    period_end_mmdd = period_end[1] + period_end[2]
-    period_end_yyyy = '20' + period_end[0]
-    period_end_yymmdd = period_end[0] + period_end_mmdd
-    period_end_mmddyy = period_end_mmdd + YY
-
-    file_type = '8k'                             #TODO: ~~create for every file type~~ remove b/c can't do it
-    try:
-        text = hit['_source']['display_names'][0]    #TODO: can't assume 0-index
-        tmp = re.findall("\([A-Z]{3,}", text)
-        ticker = tmp[0].replace('(','').replace(')','').lower()
-    except:
-        print(text)
-        print(tmp)
-
     # Company CIK should be last in the CIK list. This list may also include
     # the CIKs of executives carrying out insider transactions like in form 4.
     cik = hit["_source"]["ciks"][-1]
@@ -117,38 +102,15 @@ def build_filing_metadata_from_hit(hit: dict) -> FilingMetadata:
 
     full_submission_url = f"{submission_base_url}/{accession_number}.txt"
     
-    #route_suffix1 = f"{ticker}-{period_end_mmdd}x{period_end_yyyy}x{file_type}"
-    route_suffix1 = f"{ticker}-{file_type.lower()}_{period_end_mmddyy}"
-    route_suffix2 = f"{accession_number_short}-{YY}-{SEQ}"
-
-    # Get XSL if human readable is wanted
-    # XSL is required to download the human-readable
-    # and styled version of XML documents like form 4
-    # SEC_EDGAR_ARCHIVES_BASE_URL + /320193/000032019320000066/wf-form4_159839550969947.xml
-    # SEC_EDGAR_ARCHIVES_BASE_URL +
-    #           /320193/000032019320000066/xslF345X03/wf-form4_159839550969947.xml
-
-    # xsl = hit["_source"]["xsl"]
-    # if xsl is not None:
-    #     filing_details_url = f"{submission_base_url}/{xsl}/{filing_details_filename}"
-    # else:
-    #     filing_details_url = f"{submission_base_url}/{filing_details_filename}"
-
     filing_details_url = f"{submission_base_url}/{filing_details_filename}"
+    filing_details_filename_extension = Path(filing_details_filename).suffix.replace("htm", "html")
+    filing_details_filename = (f"{FILING_DETAILS_FILENAME_STEM}{filing_details_filename_extension}")
 
-    filing_details_filename_extension = Path(filing_details_filename).suffix.replace(
-        "htm", "html"
-    )
-    filing_details_filename = (
-        f"{FILING_DETAILS_FILENAME_STEM}{filing_details_filename_extension}"
-    )
-
-    filing_detail_page_url = f"{submission_base_short_url}/{accession_number_short}-{period_end[0][2:4]}-{SEQ}-index.htm"
+    filing_detail_page_url = f"{submission_base_short_url}/{accession_number}-index.htm"
     xlsx_financial_report_url = f"{submission_base_url}/Financial_Report.xlsx"
     html_exhibits_url = ""
-    xbrl_instance_doc_url = ""    #f"{submission_base_short_url}/{route_suffix1}_htm.xml"
-    zip_compressed_file_url = f"{submission_base_short_url}/{route_suffix2}-xbrl.zip"
-
+    xbrl_instance_doc_url = "" 
+    zip_compressed_file_url = f"{submission_base_short_url}/{accession_number}-xbrl.zip"
 
     return FilingMetadata(
         accession_number=accession_number,
@@ -262,7 +224,7 @@ def get_filing_urls_to_download(
             # Prevent rate limiting
             time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)
     finally:
-        print('all done')
+        print('log: urls completed successfully')
 
     return filings_to_fetch
 
