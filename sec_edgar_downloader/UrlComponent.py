@@ -1,4 +1,5 @@
 import requests
+import json
 from bs4 import BeautifulSoup
 import pandas as pd
 import numpy as np
@@ -101,6 +102,7 @@ class Filing:
                                 '8-K': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=4&q3=',
                                 'all': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=6&q3='
                                 }
+    __url_sec_filing_search: str = "https://www.sec.gov/edgar/search/#/q={}"
     __url_company_search: str = "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={}&type={}"
     __url_filing_detail_page: str = 'https://www.sec.gov/Archives/edgar/data/{}/{}/{}-index.htm'
     __url_filing_document: str = 'https://www.sec.gov/Archives/edgar/data/{}/{}/{}'
@@ -135,11 +137,23 @@ class Filing:
 
 
     def _get_details(accession_number: AccessionNumber) -> Tuple[str, str, str]:
-        #TODO: create algorithm (accession to cik,file_type,year) to get the actual data
-        short_cik='51143'
-        file_type='10-Q'
-        year='2021'
-        return short_cik, file_type, year
+        """accession to cik,file_type,year) to get the actual data, ex:0000072971-20-000230
+        __url_sec_filing_search = "https://www.sec.gov/edgar/search/#/q={}&dateRange=all"
+        """
+        url = 'https://efts.sec.gov/LATEST/search-index'
+        payload = {"q":accession_number.accession_number,"dateRange":"all","startdt":"2001-01-01","enddt":"2022-02-22"}
+        edgar_resp = requests.post(url, data=json.dumps(payload))
+        edgar_resp.raise_for_status()
+        edgar_list = edgar_resp.json()['hits']['hits']
+
+        if len(edgar_list) > 1:
+            print('Multiple results match description:')
+            print(edgar_list)
+        else:
+            short_cik = edgar_list[0]['_source']['ciks'][0].lstrip('0')     #'51143'
+            file_type = edgar_list[0]['_source']['form']                    #'10-Q'
+            year =  edgar_list[0]['_source']['file_date'].split('-')[0]     #'2021'
+            return short_cik, file_type, year
 
 
     def get_sec_latest_filings_detail_page(self, file_type:str) -> str:
@@ -165,12 +179,13 @@ class Filing:
 
 
     def get_accession_number(self) -> AccessionNumber:
-        """Prepare minimum info to access data
+        """Prepare minimum info to access data by taking most-recent filing
+            for a date
          #TODO: add size, primary document information for reference
 
         :param cik
-        :param file_type TODO:only works for 10-K, also need 10-Q, 8-K, etc.
-        :param year
+        :param file_type
+        :param year     TODO: change to date
         :return AccessionNumber(accno)
 
         Usage::
@@ -197,14 +212,8 @@ class Filing:
         df = pd.read_html(tbl.prettify())[0]
         
         df['Filing Date'] = pd.to_datetime(df['Filing Date'])
-        if self.file_type == '10-K':
-            row = df.loc[  (df['Filing Date'] > str(self.year)+'-01-01') & (df['Filing Date'] <= str(self.year)+'-12-31')  ]
-        elif self.file_type == '10-Q':
-            #TODO: add qtr current
-            pass
-        elif self.file_type == '8-K':
-            #TODO: add 8k
-            pass
+        row = df.loc[  (df['Filing Date'] > str(self.year)+'-01-01') & (df['Filing Date'] <= str(self.year)+'-12-31')  ]
+        #TODO: ^^^sort by closest to date then take the first row
 
         item = row['Description']
         accno = str(item.values).split('Acc-no: ')[1].split('\\')[0]
@@ -220,7 +229,8 @@ class Filing:
         """
         doc = {'ixbrl': ['10-Q','10-K','8-K'],
                'xbrl': ['XML'],
-               'text': np.nan
+               'text': np.nan,
+               'exhibit': ['EX-99.1']   #TODO:add additional versions 99.2, 99.3, ...
               }
         
         headers = {
@@ -265,8 +275,30 @@ class Filing:
         types = doc[DOC]
         document_name = df[df['Type'].isna()]['Document'].values[0]
         self._url_doc_types[DOC] = self.__url_filing_document.format(self.short_cik, acc_no_noformat, document_name)
-        pass
 
+        DOC = 'exhibit'
+        types = doc[DOC]
+        document_name = df[df['Type'].isin(types)]['Document'].values[0]
+        self._url_doc_types[DOC] = self.__url_filing_document.format(self.short_cik, acc_no_noformat, document_name)
+
+        DOC = 'xlsx'
+        document_name = 'Financial_Report.xlsx'
+        self._url_doc_types[DOC] = self.__url_filing_document.format(self.short_cik, acc_no_noformat, document_name)
+        
+        #submission_base_url = (f"{SEC_EDGAR_ARCHIVES_BASE_URL}/{self.short_cik}/{acc_no_noformat}")
+
+        return FilingMetadata(
+            accession_number = self.accession_number,
+            filing_details_filename = '',
+            full_submission_url = self._url_doc_types['text'],
+            filing_details_url = self._url_doc_types['ixbrl'],
+
+            filing_detail_page_url = filled_url,
+            xlsx_financial_report_url = self._url_doc_types['xlsx'],
+            html_exhibits_url = self._url_doc_types['exhibit'],
+            xbrl_instance_doc_url = self._url_doc_types['xbrl'],
+            zip_compressed_file_url = self._url_doc_types['zip']
+        )
 
     def get_filing_document_url(self, doc_type: str) -> str:
         """Get the document's download url

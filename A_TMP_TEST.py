@@ -7,7 +7,15 @@ import pytest
 from sec_edgar_downloader import Downloader
 from sec_edgar_downloader._constants import SUPPORTED_FILINGS, DATE_FORMAT_TOKENS
 
+from sec_edgar_downloader import UrlComponent as uc
 
+
+
+def test_filing():
+    number = '0001628280-16-020309'
+    Acc_no1 = uc.AccessionNumber(number)
+    File = uc.Filing.from_accession_number(Acc_no1)
+    assert File.short_cik == '320193'
 
 
 def test_get_urls():
@@ -33,5 +41,5 @@ def test_get_urls():
     assert len(urls) == num_filings_to_download
 
 
-
+test_filing()
 test_get_urls()

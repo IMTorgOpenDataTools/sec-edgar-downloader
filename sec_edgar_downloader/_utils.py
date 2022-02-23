@@ -1,10 +1,11 @@
 """Utility functions for the downloader class."""
+import sys
 import time
 import re
 
 from datetime import datetime
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 from urllib.parse import urljoin
 
 import requests
@@ -25,6 +26,9 @@ from ._constants import (
     SEC_EDGAR_ARCHIVES_BASE_URL,
     SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL,
     SEC_EDGAR_SEARCH_API_ENDPOINT,
+    DEFAULT_AFTER_DATE,
+    DEFAULT_BEFORE_DATE,
+    SUPPORTED_FILINGS
 )
 
 
@@ -88,7 +92,7 @@ def build_filing_metadata_from_hit(hit: dict) -> FilingMetadata:
     period_end_yymmdd = period_end[0] + period_end_mmdd
     period_end_mmddyy = period_end_mmdd + YY
 
-    file_type = '8k'                             #TODO: create for every file type
+    file_type = '8k'                             #TODO: ~~create for every file type~~ remove b/c can't do it
     try:
         text = hit['_source']['display_names'][0]    #TODO: can't assume 0-index
         tmp = re.findall("\([A-Z]{3,}", text)
@@ -280,6 +284,95 @@ def resolve_relative_urls_in_filing(filing_text: str, download_url: str) -> str:
         return soup
 
     return soup.encode(soup.original_encoding)
+
+
+def _check_params(
+        filing: str,
+        ticker_or_cik: str,
+        amount: Optional[int] = None,
+        after: Optional[str] = None,
+        before: Optional[str] = None,
+        include_amends: bool = False,
+        query: str = "",
+    ) -> int:
+        """Check parameters similar across functions.
+
+        :param filing: filing type to download (e.g. 8-K).
+        :param ticker_or_cik: ticker or CIK to download filings for.
+        :param amount: number of filings to download.
+            Defaults to all available filings.
+        :param after: date of form YYYY-MM-DD after which to download filings.
+            Defaults to 2000-01-01, the earliest date supported by EDGAR full text search.
+        :param before: date of form YYYY-MM-DD before which to download filings.
+            Defaults to today.
+        :param include_amends: denotes whether or not to include filing amends (e.g. 8-K/A).
+            Defaults to False.
+        :param download_details: denotes whether or not to download human-readable and easily
+            parseable filing detail documents (e.g. form 4 XML, 8-K HTML). Defaults to True.
+        :param query: keyword to search for in filing documents.
+        :return: params.
+        """
+        ticker_or_cik = str(ticker_or_cik).strip().upper()
+
+        # Check for blank tickers or CIKs
+        if not ticker_or_cik:
+            raise ValueError("Invalid ticker or CIK. Please enter a non-blank value.")
+
+        # Detect CIKs and ensure that they are properly zero-padded
+        if is_cik(ticker_or_cik):
+            if len(ticker_or_cik) > 10:
+                raise ValueError("Invalid CIK. CIKs must be at most 10 digits long.")
+            # Pad CIK with 0s to ensure that it is exactly 10 digits long
+            # The SEC Edgar Search API requires zero-padded CIKs to ensure
+            # that search results are accurate. Relates to issue #84.
+            ticker_or_cik = ticker_or_cik.zfill(10)
+
+        if amount is None:
+            # If amount is not specified, obtain all available filings.
+            # We simply need a large number to denote this and the loop
+            # responsible for fetching the URLs will break appropriately.
+            amount = sys.maxsize
+        else:
+            amount = int(amount)
+            if amount < 1:
+                raise ValueError(
+                    "Invalid amount. Please enter a number greater than 1."
+                )
+
+        # SEC allows for filing searches from 2000 onwards
+        if after is None:
+            after = DEFAULT_AFTER_DATE.strftime(DATE_FORMAT_TOKENS)
+        else:
+            validate_date_format(after)
+
+            if after < DEFAULT_AFTER_DATE.strftime(DATE_FORMAT_TOKENS):
+                raise ValueError(
+                    f"Filings cannot be downloaded prior to {DEFAULT_AFTER_DATE.year}. "
+                    f"Please enter a date on or after {DEFAULT_AFTER_DATE}."
+                )
+
+        if before is None:
+            before = DEFAULT_BEFORE_DATE.strftime(DATE_FORMAT_TOKENS)
+        else:
+            validate_date_format(before)
+
+        if after > before:
+            raise ValueError(
+                "Invalid after and before date combination. "
+                "Please enter an after date that is less than the before date."
+            )
+
+        if filing not in SUPPORTED_FILINGS:
+            filing_options = ", ".join(self.supported_filings)
+            raise ValueError(
+                f"'{filing}' filings are not supported. "
+                f"Please choose from the following: {filing_options}."
+            )
+
+        if not isinstance(query, str):
+            raise TypeError("Query must be of type string.")
+            
+        return filing, ticker_or_cik, amount, after, before, include_amends, query
 
 
 def download_and_save_filing(
