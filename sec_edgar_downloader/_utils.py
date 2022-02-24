@@ -224,7 +224,7 @@ def get_filing_urls_to_download(
             # Prevent rate limiting
             time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)
     finally:
-        print('log: urls completed successfully')
+        print('log: urls extracted successfully')
 
     return filings_to_fetch
 

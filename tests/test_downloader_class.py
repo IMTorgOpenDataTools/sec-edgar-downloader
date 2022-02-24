@@ -93,7 +93,7 @@ def test_get_urls():
     before_date = date(2019, 11, 15).strftime(DATE_FORMAT_TOKENS)
     include_amends = False
     # num_filings_to_download < number of filings available
-    num_filings_to_download = 100
+    num_filings_to_download = 1
 
     dl = Downloader("./Downloads")
     urls = dl.get_urls(

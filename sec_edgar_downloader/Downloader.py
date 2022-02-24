@@ -14,6 +14,7 @@ from ._utils import (
     is_cik,
     validate_date_format,
 )
+from . import UrlComponent as uc
 
 
 class Downloader:
@@ -97,9 +98,10 @@ class Downloader:
             include_amends,
             query,
         )
+        FilingList = [uc.Filing.from_accession_number( uc.AccessionNumber(filing.accession_number) ) for filing in  filings_to_fetch] 
 
         # Get number of unique accession numbers downloaded
-        return filings_to_fetch
+        return FilingList 
 
 
     def get(

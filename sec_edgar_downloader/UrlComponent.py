@@ -1,5 +1,8 @@
 import requests
 import json
+import time
+from datetime import datetime
+
 from bs4 import BeautifulSoup
 import pandas as pd
 import numpy as np
@@ -98,38 +101,42 @@ class Filing:
     company - with unique cik
     filing - with unique accenssion number
     document - multiple formats for filing including :ixbrl, xbrl, txt, zip 
+
+    Filing Date - date report is filed with SEC
+    Period of Report - timespan the report describes
     """
-    __url_sec_current_search: Dict[str,str] = {'10-K': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=0&q3=',
+    _url_sec_current_search: Dict[str,str] = {'10-K': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=0&q3=',
                                 '10-Q': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=1&q3=',
                                 '8-K': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=4&q3=',
                                 'all': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=6&q3='
                                 }
-    __url_sec_filing_search: str = "https://www.sec.gov/edgar/search/#/q={}"
-    __url_company_search: str = "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={}&type={}"
-    __url_filing_detail_page: str = 'https://www.sec.gov/Archives/edgar/data/{}/{}/{}-index.htm'
-    __url_filing_document: str = 'https://www.sec.gov/Archives/edgar/data/{}/{}/{}'
+    _url_sec_filing_search: str = "https://www.sec.gov/edgar/search/#/q={}"
+    _url_company_search: str = "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={}&type={}"
+    _url_filing_detail_page: str = 'https://www.sec.gov/Archives/edgar/data/{}/{}/{}-index.htm'
+    _url_filing_document: str = 'https://www.sec.gov/Archives/edgar/data/{}/{}/{}'
 
-    def __init__(self, short_cik:str, file_type:str, year:str) -> None:
+    def __init__(self, short_cik:str, file_type:str, file_date:str, accession_number:AccessionNumber = None) -> None:
         self.short_cik = short_cik
         self.file_type = file_type
-        self.year = year
-        self.accession_number = None
+        self.file_date = datetime.strptime(file_date, '%Y-%m-%d')           
         self.documents = []
         self.filing_metadata = None
+        self.accession_number = accession_number
 
-        try:
-            self.accession_number = self.get_accession_number()
-        except:
-            print('unable to get accession_number')
+        if self.accession_number == None:
+            try:
+                self.accession_number = self.get_accession_number()
+            except:
+                print('log: unable to get accession_number')
         try:
             self._get_filing_document_all_urls()
         except:
-            print('unable to get all filing docs urls')
+            print('log: unable to get all filing docs urls')
 
     @classmethod
     def from_accession_number(cls, accession_number: AccessionNumber) -> None:
-        short_cik, file_type, year = cls._get_details(accession_number = accession_number)
-        return cls(short_cik, file_type, year)
+        short_cik, file_type, file_date = cls._get_details(accession_number = accession_number)
+        return cls(short_cik, file_type, file_date, accession_number)
 
 
     def _get_details(accession_number: AccessionNumber) -> Tuple[str, str, str]:
@@ -140,16 +147,17 @@ class Filing:
         payload = {"q":accession_number.accession_number,"dateRange":"all","startdt":"2001-01-01","enddt":"2022-02-22"}
         edgar_resp = requests.post(url, data=json.dumps(payload))
         edgar_resp.raise_for_status()
+        time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)
         edgar_list = edgar_resp.json()['hits']['hits']
 
         if len(edgar_list) > 1:
-            print('Multiple results match description:')
+            print('log: multiple results match description.  taking the first available record:')
             print(edgar_list)
-        else:
-            short_cik = edgar_list[0]['_source']['ciks'][0].lstrip('0')     #'51143'
-            file_type = edgar_list[0]['_source']['form']                    #'10-Q'
-            year =  edgar_list[0]['_source']['file_date'].split('-')[0]     #'2021'
-            return short_cik, file_type, year
+        
+        short_cik = edgar_list[0]['_source']['ciks'][0].lstrip('0')     #'51143'
+        file_type = edgar_list[0]['_source']['form']                    #'10-Q'
+        file_date =  edgar_list[0]['_source']['file_date']              #'2021-01-29'
+        return short_cik, file_type, file_date
 
 
     def get_sec_latest_filings_detail_page(self, file_type:str) -> str:
@@ -162,9 +170,10 @@ class Filing:
         Usage::
 
         """
-        filled_url = self.__url_sec_current_search[file_type]
+        filled_url = self._url_sec_current_search[file_type]
         edgar_resp = requests.get(filled_url)
         edgar_resp.raise_for_status()
+        time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)
         edgar_str = edgar_resp.text
         
         soup = BeautifulSoup(edgar_str, 'html.parser')
@@ -179,7 +188,7 @@ class Filing:
 
         :param cik
         :param file_type
-        :param year     TODO: change to date
+        :param file_date
         :return AccessionNumber(accno)
 
         Usage::
@@ -194,9 +203,10 @@ class Filing:
                 "Accept-Encoding": "gzip, deflate"
             }
         
-        filled_url = self.__url_company_search.format(self.short_cik, self.file_type)
+        filled_url = self._url_company_search.format(self.short_cik, self.file_type)
         edgar_resp = requests.get(filled_url, headers=headers)
         edgar_resp.raise_for_status()
+        time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)
         edgar_str = edgar_resp.text
 
         soup = BeautifulSoup(edgar_str, 'html.parser')
@@ -204,8 +214,7 @@ class Filing:
         df = pd.read_html(tbl.prettify())[0]
         
         df['Filing Date'] = pd.to_datetime(df['Filing Date'])
-        row = df.loc[  (df['Filing Date'] > str(self.year)+'-01-01') & (df['Filing Date'] <= str(self.year)+'-12-31')  ]
-        #TODO: ^^^sort by closest to date then take the first row
+        row = df.loc[  (df['Filing Date'] == self.file_date)  ]
 
         item = row['Description']
         accno = str(item.values).split('Acc-no: ')[1].split('\\')[0]
@@ -225,10 +234,13 @@ class Filing:
                 "Accept-Encoding": "gzip, deflate"
             }
         #parts = AccessionNumber(acc_no).get_parts()
+        print(self.accession_number.get_accession_number())
         acc_no_noformat = self.accession_number.get_nodash_accession_number()
         #'https://www.sec.gov/Archives/edgar/data/{short_cik}/{acc_no_noformat}/{acc_no}-index.htm'
-        filled_url = self.__url_filing_detail_page.format(self.short_cik, acc_no_noformat, str(self.accession_number))
+        filled_url = self._url_filing_detail_page.format(self.short_cik, acc_no_noformat, str(self.accession_number))
         edgar_resp = requests.get(filled_url, headers=headers)
+        edgar_resp.raise_for_status()
+        time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)
         edgar_str = edgar_resp.text
         soup = BeautifulSoup(edgar_str, 'html.parser')
         tbls = soup.find_all('table')
@@ -238,16 +250,16 @@ class Filing:
             tmp = pd.read_html(tbl.prettify())[0]
             df = pd.concat([df, tmp], ignore_index=True)
         newdf = df
-        df = newdf.dropna(subset=['Description'])
 
         href = []
         for tbl in tbls:
             for a in tbl.find_all('a', href=True):
                 href.append(a['href'])
-        href[0] = href[0].split('/ix?doc=')[1]
+        href[0] = href[0].split('/ix?doc=')[1] if '/ix?doc=' in href[0] else href[0]
         extension = [ref.split('.')[1] for ref in href]
         df['URL'] = href
         df['Extension'] = extension
+        #df = newdf.dropna(subset=['Description'])
 
         tmp_list = list(df.itertuples(name='Row', index=False))
         self.documents.extend( 
@@ -258,18 +270,18 @@ class Filing:
                 Type=rec.Type,
                 Size=rec.Size,
                 URL=rec.URL,
-                Extension=rec.Extension
+                Extension=rec.Extension,
+                FS_Location=''
                 ) for rec in tmp_list ]
             )
 
         base_url = 'https://www.sec.gov'
-        url_ixbrl = base_url + df[df['Type'].isin(SUPPORTED_FILINGS)]['URL'].values[0]
-        url_xbrl = base_url + df[df['Description'].str.contains('INSTANCE')]['URL'].values[0]
-        url_text = base_url + df[df['Extension'].str.contains('txt')]['URL'].values[0]
-        url_zip = self.__url_filing_document.format(self.short_cik, acc_no_noformat, str(self.accession_number)+'-xbrl.zip')
-        url_xlsx = self.__url_filing_document.format(self.short_cik, acc_no_noformat, 'Financial_Report.xlsx')
-        df_tmp = df[df['Type'].isin(['99.1'])]
-        url_exhibit = base_url + df_tmp['URL'].values[0] if df_tmp.shape[0] > 0 else None
+        url_ixbrl = base_url + df[df['Type'].isin(SUPPORTED_FILINGS)]['URL'].values[0] if df[df['Type'].isin(SUPPORTED_FILINGS)].shape[0] > 0 else None
+        url_xbrl = base_url + df[df['Description'].str.contains('INSTANCE', na=False)]['URL'].values[0] if df[df['Description'].str.contains('INSTANCE', na=False)].shape[0] > 0 else None 
+        url_text = base_url + df[df['Extension'].str.contains('txt', na=False)]['URL'].values[0] if df[df['Extension'].str.contains('txt', na=False)].shape[0] > 0 else None
+        url_zip = self._url_filing_document.format(self.short_cik, acc_no_noformat, str(self.accession_number)+'-xbrl.zip')
+        url_xlsx = self._url_filing_document.format(self.short_cik, acc_no_noformat, 'Financial_Report.xlsx')
+        url_exhibit = base_url + df[df['Type'].isin(['99.1'])]['URL'].values[0] if df[df['Type'].isin(['99.1'])].shape[0] > 0 else None
 
         self.filing_metadata = FilingMetadata(
             accession_number = self.accession_number,

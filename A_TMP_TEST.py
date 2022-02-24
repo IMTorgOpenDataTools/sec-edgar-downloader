@@ -13,7 +13,7 @@ from sec_edgar_downloader import Downloader
 from sec_edgar_downloader._constants import DATE_FORMAT_TOKENS
 from sec_edgar_downloader._utils import EdgarSearchApiError, get_filing_urls_to_download
 
-
+"""
 def test_filing_get_filing_document_url():
     File = uc.Filing(short_cik='51143', file_type='10-Q', year='2021')
     doc_type = 'xbrl'
@@ -23,7 +23,7 @@ def test_filing_get_filing_document_url():
 
 test_filing_get_filing_document_url()
 
-"""
+
 @pytest.mark.parametrize(
     "filing_type", ["4", "8-K", "10-K", "10-Q", "SC 13G", "SD", "DEF 14A"]
 )
@@ -49,8 +49,12 @@ formatted_latest_before_date = date(2019, 11, 15).strftime(DATE_FORMAT_TOKENS)
 formatted_earliest_after_date = date(2002, 1, 1).strftime(DATE_FORMAT_TOKENS)
 for filing_type in ["10-K","8-K"]:
     test_common_filings(filing_type, formatted_earliest_after_date, formatted_latest_before_date)
+"""
 
-
+def test_specific_number():
+    number = '0001181431-12-038301'
+    results = uc.Filing.from_accession_number( uc.AccessionNumber(number) )
+    return results
 
 
 
@@ -58,8 +62,8 @@ def test_get_urls():
     # SEC Edgar Search fails to retrieve Apple 8-Ks after 2000 and before 2002
     formatted_earliest_after_date = date(2002, 1, 1).strftime(DATE_FORMAT_TOKENS)
 
-    filing_type = "8-K"
-    ticker = "AAPL"
+    filing_type = "10-Q"
+    ticker = "WFC"
     before_date = date(2019, 11, 15).strftime(DATE_FORMAT_TOKENS)
     include_amends = False
     # num_filings_to_download < number of filings available
@@ -77,5 +81,7 @@ def test_get_urls():
     assert len(urls) == num_filings_to_download
 
 
+
+
+#test_specific_number()
 test_get_urls()
-"""

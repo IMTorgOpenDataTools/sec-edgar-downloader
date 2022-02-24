@@ -23,26 +23,19 @@ def test_acc_get_nodash_number():
 
 
 # Filing
-FORM_TYPE = '10-K'    #TODO:expand to other file_types
 
 def test_filing():
+    FORM_TYPE = '10-K'
     number = '0001628280-16-020309'
     Acc_no1 = uc.AccessionNumber(number)
-    File = uc.Filing(short_cik=320193, file_type=FORM_TYPE, year='2016')
+    File = uc.Filing(short_cik=320193, file_type=FORM_TYPE, file_date='2016-10-26')
     assert File.accession_number.get_accession_number() == Acc_no1.get_accession_number()
 
 
 def test_filing_get_sec_latest_filings():
-    File = uc.Filing(short_cik=320193, file_type=FORM_TYPE, year='2016')
+    FORM_TYPE = '10-K'
+    File = uc.Filing(short_cik=320193, file_type=FORM_TYPE, file_date='2016-10-26')
     assert len(File.get_sec_latest_filings_detail_page(FORM_TYPE)) > 0
-
-
-def test_filing_get_filing_document_url():
-    File = uc.Filing(short_cik='51143', file_type='10-Q', year='2021')
-    doc_type = 'xbrl'
-    File.set_accession_number('0001558370-21-014734')
-    File._get_filing_document_all_urls()
-    assert File.get_filing_document_url(doc_type) == 'https://www.sec.gov/Archives/edgar/data/51143/000155837021014734/ibm-20210930x10q_htm.xml'
 
 
 def test_filing_construct_with_accession():
@@ -50,3 +43,11 @@ def test_filing_construct_with_accession():
     Acc_no1 = uc.AccessionNumber(number)
     File = uc.Filing.from_accession_number(Acc_no1)
     assert File.short_cik == '320193'
+
+
+def test_filing_get_filing_document_url():
+    File = uc.Filing(short_cik='51143', file_type='10-Q', file_date='2021-11-05')
+    doc_type = 'xbrl'
+    File.set_accession_number('0001558370-21-014734')
+    File._get_filing_document_all_urls()
+    assert File.filing_metadata.xbrl_instance_doc_url == 'https://www.sec.gov/Archives/edgar/data/51143/000155837021014734/ibm-20210930x10q_htm.xml'

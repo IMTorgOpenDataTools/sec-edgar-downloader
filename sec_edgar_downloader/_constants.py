@@ -32,7 +32,8 @@ DocumentMetadata = namedtuple(
         "Type",
         "Size",
         "URL",
-        "Extension"
+        "Extension",
+        "FS_Location"
     ]
 )
 
