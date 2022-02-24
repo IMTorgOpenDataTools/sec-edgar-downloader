@@ -38,7 +38,6 @@ class EdgarSearchApiError(Exception):
     """Error raised when Edgar Search API encounters a problem."""
 
 
-
 # Specify max number of request retries
 # https://stackoverflow.com/a/35504626/3820660
 retries = Retry(
@@ -113,7 +112,9 @@ def build_filing_metadata_from_hit(hit: dict) -> FilingMetadata:
     zip_compressed_file_url = f"{submission_base_short_url}/{accession_number}-xbrl.zip"
 
     return FilingMetadata(
+        cik=cik_short,
         accession_number=accession_number,
+        document_metadata_list='',
         filing_details_filename=filing_details_filename,
         full_submission_url=full_submission_url,
         filing_details_url=filing_details_url,
@@ -325,7 +326,7 @@ def _check_params(
             )
 
         if filing not in SUPPORTED_FILINGS:
-            filing_options = ", ".join(self.supported_filings)
+            filing_options = ", ".join(SUPPORTED_FILINGS)
             raise ValueError(
                 f"'{filing}' filings are not supported. "
                 f"Please choose from the following: {filing_options}."
@@ -381,7 +382,7 @@ def download_filings(
     download_folder: Path,
     ticker_or_cik: str,
     filing_type: str,
-    filings_to_fetch: List[FilingMetadata],
+    filings_to_fetch: List,
     include_filing_details: bool,
 ) -> None:
     client = requests.Session()

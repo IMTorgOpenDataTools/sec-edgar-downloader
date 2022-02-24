@@ -54,6 +54,13 @@ def test_supported_filings(downloader):
     assert dl.supported_filings == expected
 
 
+def test_get_sec_latest_filings():
+    FORM_TYPE = '10-K'
+    dl = Downloader()
+    Url_list = dl.get_sec_latest_filings_detail_page(file_type=FORM_TYPE)
+    assert len(Url_list) > 0
+
+
 def test__check_params():
     # SEC Edgar Search fails to retrieve Apple 8-Ks after 2000 and before 2002
     formatted_earliest_after_date = date(2002, 1, 1).strftime(DATE_FORMAT_TOKENS)
@@ -96,7 +103,7 @@ def test_get_urls():
     num_filings_to_download = 1
 
     dl = Downloader("./Downloads")
-    urls = dl.get_urls(
+    url_count = dl.get_urls(
         filing=filing_type,
         ticker_or_cik = ticker,
         amount = num_filings_to_download,
@@ -105,4 +112,4 @@ def test_get_urls():
         include_amends=include_amends,
     )
 
-    assert len(urls) == num_filings_to_download
+    assert url_count == num_filings_to_download

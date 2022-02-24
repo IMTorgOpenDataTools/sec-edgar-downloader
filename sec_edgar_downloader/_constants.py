@@ -9,7 +9,9 @@ from faker import Faker
 FilingMetadata = namedtuple(
     "FilingMetadata",
     [  #original
+        "cik",
         "accession_number",
+        "document_metadata_list",
         "filing_details_filename",
         "full_submission_url",        #text
         "filing_details_url",         #htm(ixbrl)

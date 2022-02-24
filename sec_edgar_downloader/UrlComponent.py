@@ -1,6 +1,8 @@
+import os
 import requests
 import json
 import time
+import pickle
 from datetime import datetime
 
 from bs4 import BeautifulSoup
@@ -105,21 +107,16 @@ class Filing:
     Filing Date - date report is filed with SEC
     Period of Report - timespan the report describes
     """
-    _url_sec_current_search: Dict[str,str] = {'10-K': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=0&q3=',
-                                '10-Q': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=1&q3=',
-                                '8-K': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=4&q3=',
-                                'all': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=6&q3='
-                                }
+
     _url_sec_filing_search: str = "https://www.sec.gov/edgar/search/#/q={}"
     _url_company_search: str = "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={}&type={}"
     _url_filing_detail_page: str = 'https://www.sec.gov/Archives/edgar/data/{}/{}/{}-index.htm'
     _url_filing_document: str = 'https://www.sec.gov/Archives/edgar/data/{}/{}/{}'
 
-    def __init__(self, short_cik:str, file_type:str, file_date:str, accession_number:AccessionNumber = None) -> None:
+    def __init__(self, short_cik:str, accession_number:AccessionNumber, file_type:str = None, file_date:str = None) -> None:
         self.short_cik = short_cik
         self.file_type = file_type
-        self.file_date = datetime.strptime(file_date, '%Y-%m-%d')           
-        self.documents = []
+        self.file_date = file_date         
         self.filing_metadata = None
         self.accession_number = accession_number
 
@@ -137,6 +134,11 @@ class Filing:
     def from_accession_number(cls, accession_number: AccessionNumber) -> None:
         short_cik, file_type, file_date = cls._get_details(accession_number = accession_number)
         return cls(short_cik, file_type, file_date, accession_number)
+
+    @classmethod
+    def from_file_details(cls, short_cik:str, file_type:str, file_date:str) -> None:
+        accession_number = cls._get_accession_number(short_cik, file_type, file_date)
+        return cls(short_cik, accession_number, file_type, file_date)
 
 
     def _get_details(accession_number: AccessionNumber) -> Tuple[str, str, str]:
@@ -160,30 +162,7 @@ class Filing:
         return short_cik, file_type, file_date
 
 
-    def get_sec_latest_filings_detail_page(self, file_type:str) -> str:
-        """Get the Filing Detail page urls for the most-recent filings.
-        This list is updated every 10min.
-        
-        :param file_type TODO:only works for 10-K, also need 10-Q, 8-K, etc.
-        :return urls
-
-        Usage::
-
-        """
-        filled_url = self._url_sec_current_search[file_type]
-        edgar_resp = requests.get(filled_url)
-        edgar_resp.raise_for_status()
-        time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)
-        edgar_str = edgar_resp.text
-        
-        soup = BeautifulSoup(edgar_str, 'html.parser')
-        href = soup.find('table').find_all('a')
-        url_list = [tag[1].attrs['href'] for tag in enumerate(href) if tag[0]%2==0][:-1]
-        
-        return url_list
-
-
-    def get_accession_number(self) -> AccessionNumber:
+    def _get_accession_number(short_cik:str, file_type:str, file_date:str) -> AccessionNumber:
         """Prepare minimum info to access data by taking most-recent filing for a date.
 
         :param cik
@@ -194,16 +173,13 @@ class Filing:
         Usage::
 
         """
-        if self.accession_number:
-            return self.accession_number
-
         headers = {
                 "User-Agent": generate_random_user_agent(),
                 "From": generate_random_user_agent(),
                 "Accept-Encoding": "gzip, deflate"
             }
-        
-        filled_url = self._url_company_search.format(self.short_cik, self.file_type)
+        _url_company_search: str = "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={}&type={}"
+        filled_url = _url_company_search.format(short_cik, file_type)
         edgar_resp = requests.get(filled_url, headers=headers)
         edgar_resp.raise_for_status()
         time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)
@@ -214,7 +190,7 @@ class Filing:
         df = pd.read_html(tbl.prettify())[0]
         
         df['Filing Date'] = pd.to_datetime(df['Filing Date'])
-        row = df.loc[  (df['Filing Date'] == self.file_date)  ]
+        row = df.loc[  (df['Filing Date'] == file_date)  ]
 
         item = row['Description']
         accno = str(item.values).split('Acc-no: ')[1].split('\\')[0]
@@ -233,18 +209,23 @@ class Filing:
                 "From": generate_random_user_agent(),
                 "Accept-Encoding": "gzip, deflate"
             }
-        #parts = AccessionNumber(acc_no).get_parts()
         print(self.accession_number.get_accession_number())
         acc_no_noformat = self.accession_number.get_nodash_accession_number()
         #'https://www.sec.gov/Archives/edgar/data/{short_cik}/{acc_no_noformat}/{acc_no}-index.htm'
         filled_url = self._url_filing_detail_page.format(self.short_cik, acc_no_noformat, str(self.accession_number))
+
         edgar_resp = requests.get(filled_url, headers=headers)
         edgar_resp.raise_for_status()
         time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)
         edgar_str = edgar_resp.text
         soup = BeautifulSoup(edgar_str, 'html.parser')
+
+        file_type = soup.find('div', attrs={'class':'companyInfo'}).find(text='Type: ').find_next_sibling('strong').text
+        file_date = soup.find('div', text="Filing Date", attrs={'class': 'infoHead'}).find_next_sibling('div', attrs={'class': 'info'}).text
+        self.file_type = file_type if self.file_type == None else self.file_type
+        self.file_date = datetime.strptime(file_date, '%Y-%m-%d') if self.file_date == None else self.file_date
+
         tbls = soup.find_all('table')
-        
         df = pd.DataFrame()
         for tbl in tbls:
             tmp = pd.read_html(tbl.prettify())[0]
@@ -262,18 +243,16 @@ class Filing:
         #df = newdf.dropna(subset=['Description'])
 
         tmp_list = list(df.itertuples(name='Row', index=False))
-        self.documents.extend( 
-            [ DocumentMetadata(
-                Seq=rec.Seq,
-                Description=rec.Description,
-                Document=rec.Document,
-                Type=rec.Type,
-                Size=rec.Size,
-                URL=rec.URL,
-                Extension=rec.Extension,
-                FS_Location=''
-                ) for rec in tmp_list ]
-            )
+        tmp_documents = [ DocumentMetadata(
+                            Seq=rec.Seq,
+                            Description=rec.Description,
+                            Document=rec.Document,
+                            Type=rec.Type,
+                            Size=rec.Size,
+                            URL=rec.URL,
+                            Extension=rec.Extension,
+                            FS_Location=''
+                            ) for rec in tmp_list ]
 
         base_url = 'https://www.sec.gov'
         url_ixbrl = base_url + df[df['Type'].isin(SUPPORTED_FILINGS)]['URL'].values[0] if df[df['Type'].isin(SUPPORTED_FILINGS)].shape[0] > 0 else None
@@ -284,7 +263,9 @@ class Filing:
         url_exhibit = base_url + df[df['Type'].isin(['99.1'])]['URL'].values[0] if df[df['Type'].isin(['99.1'])].shape[0] > 0 else None
 
         self.filing_metadata = FilingMetadata(
+            cik=self.short_cik,
             accession_number = self.accession_number,
+            document_metadata_list = tmp_documents,
             filing_details_filename = '',
             full_submission_url = url_text,
             filing_details_url = url_ixbrl,
@@ -299,3 +280,53 @@ class Filing:
     def set_accession_number(self, accession_number: str) -> None:
         self.accession_number = AccessionNumber(accession_number)
         pass
+
+
+
+
+
+
+class FilingStorage:
+    """Functionality for maintaining a list of Filings as a binary file
+    in a directory.
+    
+    param: FilingList
+    param: dir_path
+    """
+
+    _file_name = 'filing_storage.pickle'
+    
+    def __init__(self, FilingList:List = [], dir_path:str = None):
+        self.FilingList = FilingList
+        if dir_path != None:
+            self.file_path = os.path.join(dir_path, self._file_name)
+        
+        file_exists = os.path.exists(self.file_path)
+        if file_exists:
+            self.FilingList = self.loads_from_pickle()
+        else:
+            self.dumps_to_pickle()
+            print('log: created file for storing Filings list')
+            
+
+    def dumps_to_pickle(self, file_path=None):
+        """Dumps so that pickled data can be loaded with Python 3.4 or newer"""
+        if file_path != None:
+            pickle.dumps(self.FilingList, file_path, protocol=4)
+        else:
+            pickle.dumps(self.FilingList, self.file_path, protocol=4)
+
+
+    def loads_from_pickle(self, file_path=None):
+        """Load the pickle file with Python 3.4 or newer"""
+        if file_path != None:
+            self.FilingList = pickle.loads(file_path)
+        else:
+            self.FilingList = pickle.loads(self.file_path)
+            print(f'log: loaded Filing list from file: {self.file_path}')
+
+    def add_new_list(self, new_list):
+        self.FilingList.extend(new_list)
+
+    def get_list(self):
+        return self.FilingList

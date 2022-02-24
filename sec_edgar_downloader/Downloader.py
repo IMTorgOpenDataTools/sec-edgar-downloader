@@ -1,10 +1,13 @@
 """Provides a :class:`Downloader` class for downloading SEC EDGAR filings."""
+import requests
+import time
+from bs4 import BeautifulSoup
 
 import sys
 from pathlib import Path
-from typing import ClassVar, List, Optional, Union
+from typing import ClassVar, List, Optional, Union, Dict
 
-from ._constants import DATE_FORMAT_TOKENS, DEFAULT_AFTER_DATE, DEFAULT_BEFORE_DATE
+from ._constants import DATE_FORMAT_TOKENS, DEFAULT_AFTER_DATE, DEFAULT_BEFORE_DATE, SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL
 from ._constants import SUPPORTED_FILINGS as _SUPPORTED_FILINGS
 from ._utils import (
     download_filings,
@@ -15,6 +18,10 @@ from ._utils import (
     validate_date_format,
 )
 from . import UrlComponent as uc
+
+
+
+
 
 
 class Downloader:
@@ -33,7 +40,11 @@ class Downloader:
         # Download to relative or absolute path
         >>> dl = Downloader("/path/to/valid/save/location")
     """
-
+    _url_sec_current_search: Dict[str,str] = {'10-K': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=0&q3=',
+                                '10-Q': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=1&q3=',
+                                '8-K': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=4&q3=',
+                                'all': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=6&q3='
+                                }
     supported_filings: ClassVar[List[str]] = sorted(_SUPPORTED_FILINGS)
 
     def __init__(self, download_folder: Union[str, Path, None] = None) -> None:
@@ -44,6 +55,32 @@ class Downloader:
             self.download_folder = download_folder
         else:
             self.download_folder = Path(download_folder).expanduser().resolve()
+
+        self.filing_storage: uc.FilingStorage = uc.FilingStorage(download_filings)
+
+
+    def get_sec_latest_filings_detail_page(self, file_type:str) -> str:
+        """Get the Filing Detail page urls for the most-recent filings.
+        This list is updated every 10min.
+        
+        :param file_type
+        :return urls
+
+        Usage::
+
+        """
+        filled_url = self._url_sec_current_search[file_type]
+        edgar_resp = requests.get(filled_url)
+        edgar_resp.raise_for_status()
+        time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)
+        edgar_str = edgar_resp.text
+        
+        soup = BeautifulSoup(edgar_str, 'html.parser')
+        href = soup.find('table').find_all('a')
+        url_list = [tag[1].attrs['href'] for tag in enumerate(href) if tag[0]%2==0][:-1]
+        
+        return url_list
+
 
     def get_urls(
         self,
@@ -85,10 +122,6 @@ class Downloader:
             query = query,
         )
 
-        #TODO:steps
-        #add urls that should be gotten to FilingMetadata
-        #run this, then check results for missing urls
-        #for urls that are missing, creating Filing and populate data
         filings_to_fetch = get_filing_urls_to_download(
             filing,
             ticker_or_cik,
@@ -98,10 +131,15 @@ class Downloader:
             include_amends,
             query,
         )
-        FilingList = [uc.Filing.from_accession_number( uc.AccessionNumber(filing.accession_number) ) for filing in  filings_to_fetch] 
+        FilingList = [ uc.Filing(short_cik = filing.cik, 
+                                    accession_number = uc.AccessionNumber(filing.accession_number)
+                                    ) 
+                        for filing in  filings_to_fetch
+                        ] 
 
         # Get number of unique accession numbers downloaded
-        return FilingList 
+        self.filing_storage.add_new_list( FilingList )
+        return len(FilingList) 
 
 
     def get(
@@ -181,16 +219,13 @@ class Downloader:
             query,
         )
 
-        filings_to_fetch = get_filing_urls_to_download(
-            filing,
-            ticker_or_cik,
-            amount,
-            after,
-            before,
-            include_amends,
-            query,
-        )
+        if self.filing_storage == None or self.filing_storage.get_list() == []:
+            print('log: you must run `get_urls()` before downloading the documents')
+            return None
+        else:
+            filings_to_fetch = self.filing_storage.get_list()
 
+        #TODO: just download urls by Type (param), and populate self.filing_list.document_metadata with FS_location
         download_filings(
             self.download_folder,
             ticker_or_cik,

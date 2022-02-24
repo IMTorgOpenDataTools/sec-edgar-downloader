@@ -52,10 +52,18 @@ for filing_type in ["10-K","8-K"]:
 """
 
 def test_specific_number():
+    cik = '320193'
     number = '0001181431-12-038301'
-    results = uc.Filing.from_accession_number( uc.AccessionNumber(number) )
+    results = uc.Filing(cik, uc.AccessionNumber(number) )
     return results
 
+
+def test_filing_get_filing_document_url():
+    short_cik='51143'
+    number = '0001628280-16-020309'
+    doc_type = {'xbrl':'xbrl_instance_doc_url'}
+    File = uc.Filing(short_cik, uc.AccessionNumber(number) )
+    assert getattr(File.filing_metadata, doc_type['xbrl']) == 'https://www.sec.gov/Archives/edgar/data/320193/000162828016020309/aapl-20160924.xml'
 
 
 def test_get_urls():
@@ -67,10 +75,10 @@ def test_get_urls():
     before_date = date(2019, 11, 15).strftime(DATE_FORMAT_TOKENS)
     include_amends = False
     # num_filings_to_download < number of filings available
-    num_filings_to_download = 100
+    num_filings_to_download = 1
 
     dl = Downloader("./Downloads")
-    urls = dl.get_urls(
+    urls_count = dl.get_urls(
         filing=filing_type,
         ticker_or_cik = ticker,
         amount = num_filings_to_download,
@@ -78,10 +86,10 @@ def test_get_urls():
         before = before_date,
         include_amends=include_amends,
     )
-    assert len(urls) == num_filings_to_download
+    assert urls_count == num_filings_to_download
 
 
 
-
-#test_specific_number()
+test_filing_get_filing_document_url()
+test_specific_number()
 test_get_urls()
