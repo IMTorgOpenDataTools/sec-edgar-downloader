@@ -10,6 +10,7 @@ from typing import ClassVar, List, Optional, Union, Dict
 from ._constants import DATE_FORMAT_TOKENS, DEFAULT_AFTER_DATE, DEFAULT_BEFORE_DATE, SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL
 from ._constants import SUPPORTED_FILINGS as _SUPPORTED_FILINGS
 from ._utils import (
+    download_urls,
     download_filings,
     _check_params,
     get_filing_urls_to_download,
@@ -56,7 +57,8 @@ class Downloader:
         else:
             self.download_folder = Path(download_folder).expanduser().resolve()
 
-        self.filing_storage: uc.FilingStorage = uc.FilingStorage(download_filings)
+        Path(self.download_folder).mkdir(parents=True, exist_ok=True)
+        self.filing_storage: uc.FilingStorage = uc.FilingStorage(self.download_folder)
 
 
     def get_sec_latest_filings_detail_page(self, file_type:str) -> str:
@@ -131,15 +133,15 @@ class Downloader:
             include_amends,
             query,
         )
-        FilingList = [ uc.Filing(short_cik = filing.cik, 
+        NewFilingList = [ uc.Filing(short_cik = filing.cik, 
                                     accession_number = uc.AccessionNumber(filing.accession_number)
                                     ) 
                         for filing in  filings_to_fetch
                         ] 
 
         # Get number of unique accession numbers downloaded
-        self.filing_storage.add_new_list( FilingList )
-        return len(FilingList) 
+        self.filing_storage.add_new_list( NewFilingList )
+        return len(NewFilingList) 
 
 
     def get(
@@ -219,13 +221,14 @@ class Downloader:
             query,
         )
 
-        if self.filing_storage == None or self.filing_storage.get_list() == []:
+        if self.filing_storage == None or len(self.filing_storage.get_list()) < 1:
             print('log: you must run `get_urls()` before downloading the documents')
             return None
         else:
             filings_to_fetch = self.filing_storage.get_list()
 
-        #TODO: just download urls by Type (param), and populate self.filing_list.document_metadata with FS_location
+        download_urls(self.download_folder, filing, filings_to_fetch)
+        """
         download_filings(
             self.download_folder,
             ticker_or_cik,
@@ -233,6 +236,8 @@ class Downloader:
             filings_to_fetch,
             download_details,
         )
+        """
 
         # Get number of unique accession numbers downloaded
-        return get_number_of_unique_filings(filings_to_fetch)
+        #return get_number_of_unique_filings(filings_to_fetch)
+        return len(filings_to_fetch)

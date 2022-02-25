@@ -113,6 +113,7 @@ def build_filing_metadata_from_hit(hit: dict) -> FilingMetadata:
 
     return FilingMetadata(
         cik=cik_short,
+        ticker='',
         accession_number=accession_number,
         document_metadata_list='',
         filing_details_filename=filing_details_filename,
@@ -338,6 +339,60 @@ def _check_params(
         return filing, ticker_or_cik, amount, after, before, include_amends, query
 
 
+
+
+def download_urls(download_folder, filing, list_of_document_urls):
+    base_url = 'https://www.sec.gov'
+    fs_path = []
+
+    client = requests.Session()
+    client.mount("http://", HTTPAdapter(max_retries=retries))
+    client.mount("https://", HTTPAdapter(max_retries=retries))
+    headers = {
+        "User-Agent": generate_random_user_agent(),
+        "Accept-Encoding": "gzip, deflate",
+        "Host": "www.sec.gov",
+        }
+    for file in list_of_document_urls:
+        if file.file_type == filing:
+            for doc in file.filing_metadata.document_metadata_list:
+                if '99.1' in str(doc.Type):
+                    try:
+                        url = base_url + doc.URL
+                        resp = client.get(url, headers=headers)
+                        resp.raise_for_status()
+                        filing_text = resp.content
+
+                        # Create all parent directories as needed and write content to file
+                        save_path = (
+                            download_folder
+                            / ROOT_SAVE_FOLDER_NAME
+                            / file.short_cik
+                            / file.file_type
+                            / file.accession_number.__str__()
+                            / doc.Document
+                            )
+                        save_path.parent.mkdir(parents=True, exist_ok=True)
+                        save_path.write_bytes(filing_text) 
+                        doc.FS_Location = save_path            
+                        # Prevent rate limiting
+                        time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)             
+                    except requests.exceptions.HTTPError as e:  # pragma: no cover
+                            print(
+                                "Skipping full submission download for "
+                                f"'{doc.URL}' due to network error: {e}."
+                            )
+    #TODO:update docs with location of downloaded file
+    return list_of_document_urls
+        
+
+
+
+
+
+
+
+
 def download_and_save_filing(
     client: requests.Session,
     download_folder: Path,
@@ -384,7 +439,8 @@ def download_filings(
     filing_type: str,
     filings_to_fetch: List,
     include_filing_details: bool,
-) -> None:
+    ) -> None:
+
     client = requests.Session()
     client.mount("http://", HTTPAdapter(max_retries=retries))
     client.mount("https://", HTTPAdapter(max_retries=retries))
@@ -395,9 +451,9 @@ def download_filings(
                     client,
                     download_folder,
                     ticker_or_cik,
-                    filing.accession_number,
+                    filing.accession_number.get_accession_number(),
                     filing_type,
-                    filing.full_submission_url,
+                    filing.filing_metadata.full_submission_url,
                     FILING_FULL_SUBMISSION_FILENAME,
                 )
             except requests.exceptions.HTTPError as e:  # pragma: no cover
@@ -412,10 +468,10 @@ def download_filings(
                         client,
                         download_folder,
                         ticker_or_cik,
-                        filing.accession_number,
+                        filing.accession_number.get_accession_number(),
                         filing_type,
-                        filing.filing_details_url,
-                        filing.filing_details_filename,
+                        filing.filing_metadata.filing_detail_page_url,
+                        filing.filing_metadata.filing_details_filename,
                         resolve_urls=True,
                     )
                 except requests.exceptions.HTTPError as e:  # pragma: no cover
@@ -425,3 +481,6 @@ def download_filings(
                     )
     finally:
         client.close()
+
+
+

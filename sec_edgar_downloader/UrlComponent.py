@@ -1,4 +1,6 @@
 import os
+from pathlib import Path
+
 import requests
 import json
 import time
@@ -220,6 +222,7 @@ class Filing:
         edgar_str = edgar_resp.text
         soup = BeautifulSoup(edgar_str, 'html.parser')
 
+        #ticker = 
         file_type = soup.find('div', attrs={'class':'companyInfo'}).find(text='Type: ').find_next_sibling('strong').text
         file_date = soup.find('div', text="Filing Date", attrs={'class': 'infoHead'}).find_next_sibling('div', attrs={'class': 'info'}).text
         self.file_type = file_type if self.file_type == None else self.file_type
@@ -263,7 +266,8 @@ class Filing:
         url_exhibit = base_url + df[df['Type'].isin(['99.1'])]['URL'].values[0] if df[df['Type'].isin(['99.1'])].shape[0] > 0 else None
 
         self.filing_metadata = FilingMetadata(
-            cik=self.short_cik,
+            cik = self.short_cik,
+            ticker = '',
             accession_number = self.accession_number,
             document_metadata_list = tmp_documents,
             filing_details_filename = '',
@@ -296,37 +300,42 @@ class FilingStorage:
 
     _file_name = 'filing_storage.pickle'
     
-    def __init__(self, FilingList:List = [], dir_path:str = None):
-        self.FilingList = FilingList
-        if dir_path != None:
-            self.file_path = os.path.join(dir_path, self._file_name)
+    def __init__(self, dir_path:Path):
+        self.file_path = Path.joinpath(dir_path, self._file_name) 
+        self.__FilingList:List[FilingMetadata] = []
         
-        file_exists = os.path.exists(self.file_path)
-        if file_exists:
-            self.FilingList = self.loads_from_pickle()
+        if Path.exists(self.file_path) and Path.is_file(self.file_path):
+            self.load_from_pickle()
         else:
-            self.dumps_to_pickle()
+            self.dump_to_pickle()
             print('log: created file for storing Filings list')
-            
 
-    def dumps_to_pickle(self, file_path=None):
+
+    def dump_to_pickle(self):
         """Dumps so that pickled data can be loaded with Python 3.4 or newer"""
-        if file_path != None:
-            pickle.dumps(self.FilingList, file_path, protocol=4)
-        else:
-            pickle.dumps(self.FilingList, self.file_path, protocol=4)
+        with open(self.file_path, 'wb') as File:
+            pickle.dump(self.__FilingList, File, protocol=4)
+        print('log: updated filing storage')
 
 
-    def loads_from_pickle(self, file_path=None):
+    def load_from_pickle(self):
         """Load the pickle file with Python 3.4 or newer"""
-        if file_path != None:
-            self.FilingList = pickle.loads(file_path)
-        else:
-            self.FilingList = pickle.loads(self.file_path)
-            print(f'log: loaded Filing list from file: {self.file_path}')
+        with open(self.file_path, 'rb') as File:
+            self.__FilingList = pickle.load(File)
+        print(f'log: loaded Filing list from file: {self.file_path}')
 
-    def add_new_list(self, new_list):
-        self.FilingList.extend(new_list)
+
+    def add_new_list(self, new_list:List[FilingMetadata]):
+        if type(new_list) == list:
+            unique_list = list(set(new_list))
+            self.__FilingList.extend(unique_list)   
+        self.dump_to_pickle()
+
 
     def get_list(self):
-        return self.FilingList
+        return self.__FilingList
+
+
+    def set_list(self, new_list):
+        if len(new_list) > 0 and type(new_list) == List[FilingMetadata] and len(self.__FilingList) < 1:
+            self.__FilingList = new_list

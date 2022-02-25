@@ -10,6 +10,7 @@ FilingMetadata = namedtuple(
     "FilingMetadata",
     [  #original
         "cik",
+        "ticker",
         "accession_number",
         "document_metadata_list",
         "filing_details_filename",
