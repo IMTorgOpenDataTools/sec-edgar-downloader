@@ -6,11 +6,13 @@ import json
 import time
 import pickle
 from datetime import datetime
+import gc
 
 from bs4 import BeautifulSoup
 import pandas as pd
 import numpy as np
 from typing import ClassVar, Dict, List, Optional, Tuple, Union
+from rapidfuzz import process, fuzz
 
 #from ._utils import generate_random_user_agent
 from ._constants import (
@@ -339,3 +341,135 @@ class FilingStorage:
     def set_list(self, new_list):
         if len(new_list) > 0 and type(new_list) == List[FilingMetadata] and len(self.__FilingList) < 1:
             self.__FilingList = new_list
+
+
+
+
+
+
+class Firm():
+    """TODO:The Firm is root for all classes used.
+
+    TODO: __repr__() method for listing
+    """
+
+    __ciks = set()
+    
+    def __init__(self, firm_name=None, ticker=None, cik=None):
+        """Create populated Firm object, if object not previously created."""
+        self._name = firm_name
+        self._cik = cik
+        self._ticker = ticker
+        self._exchange = None
+
+        #TODO: getters/setters
+        self._report = None
+        self._security = None
+        self._management = None
+
+        if self._name:
+            try:
+                result = self._get_info_from_name(firm_name)
+            except:
+                raise Exception("The firm is not available.")
+            else:
+                self._name = result['name']
+                self._cik = result['cik']
+                self._ticker = result['ticker']
+                self._exchange = result['exchange']
+                
+        elif self._ticker:
+            try:
+                result = self._get_info_from_ticker(ticker)
+            except:
+                raise Exception("The ticker is not available.")
+            else:
+                self._name = result['name']
+                self._cik = result['cik']
+                self._ticker = result['ticker']
+                self._exchange = result['exchange']
+        else:
+            pass
+        if self._cik in Firm.__ciks:
+            raise ValueError('firm previously created')
+        elif self._cik == None:
+            raise ValueError('firm not registered at sec')
+        else:
+            Firm.__ciks.add(self._cik)
+
+
+    def __repr__(self) -> str:
+        val = self.get_info(info='name') 
+        if val != None:
+            return val
+        else:
+            return 'None'
+
+    def __get_list_of_all_firms__(self):
+        return [ o for o in gc.get_objects() if isinstance(o, Firm)]
+
+    
+    def get_info(self, info='all'):
+        """Return all or specific firm information from attributes"""
+        if self._cik:
+            results = {'cik':self._cik, 'name': self._name, 'ticker': self._ticker, 'exchange': self._exchange}
+        else:
+            return None
+        if info=='all':
+            return results
+        elif info in ['cik','name','ticker','exchange']:
+            return results[info]
+
+
+    def _get_info_from_name(self, firm_name):
+        """Get firm info from lookup.
+
+        Args:
+            firm_name(str): closely-related firm name
+            info: 'cik', 'name', 'ticker', 'exchange', or 'all'
+
+        Returns:
+            'all': {'cik', 'name', 'ticker', 'exchange', or 'all'}
+
+        TODO: get additional info from `<browser> https://www.sec.gov/edgar/browse/?CIK=1084869`
+        address, industry, etc. can be used for querying on firms
+        TODO: add this as class-level data for use across all objects (pulled only once)
+        """
+        result = self.get_info()
+        if result is None:
+            url = 'https://www.sec.gov/files/company_tickers_exchange.json'
+            resp = requests.get(url)
+            json = resp.json()
+
+            choices = [item[1] for item in json['data']]
+            possible_names = process.extract(firm_name, choices, scorer=fuzz.WRatio, limit=3)
+            print(f'Chose the first of these closely-related names: {possible_names}')
+            result = [item for item in json['data'] if item[1]==possible_names[0][0]]
+
+            rtn_item = {}
+            for idx,key in enumerate(json['fields']):
+                rtn_item[str(key)] = result[0][idx]
+            return rtn_item
+        
+    def _get_info_from_ticker(self, ticker):
+            url = 'https://www.sec.gov/files/company_tickers_exchange.json'
+            resp = requests.get(url)
+            json = resp.json()
+
+            json['data']
+            result = [item for item in json['data'] if item[2]==ticker]
+            
+            rtn_item = {}
+            for idx,key in enumerate(json['fields']):
+                rtn_item[str(key)] = result[0][idx]
+
+            return rtn_item                  
+        
+    def get_reports_count(self):
+        #TODO: check_reports_in_cache
+        cnt = len(self._reports)
+        return cnt
+
+    def get_insider_transactions(self):
+        #TODO: https://www.sec.gov/cgi-bin/own-disp?action=getissuer&CIK=0001084869
+        pass

@@ -374,7 +374,7 @@ def download_urls(download_folder, filing, list_of_document_urls):
                             )
                         save_path.parent.mkdir(parents=True, exist_ok=True)
                         save_path.write_bytes(filing_text) 
-                        doc.FS_Location = save_path            
+                        #TODO: doc.FS_Location = save_path            
                         # Prevent rate limiting
                         time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)             
                     except requests.exceptions.HTTPError as e:  # pragma: no cover
