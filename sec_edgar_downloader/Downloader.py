@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import ClassVar, List, Optional, Union, Dict
 
-from ._constants import DATE_FORMAT_TOKENS, DEFAULT_AFTER_DATE, DEFAULT_BEFORE_DATE, SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL
+from ._constants import DATE_FORMAT_TOKENS, DEFAULT_AFTER_DATE, DEFAULT_BEFORE_DATE, SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL, ROOT_SAVE_FOLDER_NAME
 from ._constants import SUPPORTED_FILINGS as _SUPPORTED_FILINGS
 from ._utils import (
     download_urls,
@@ -50,6 +50,10 @@ class Downloader:
 
     def __init__(self, download_folder: Union[str, Path, None] = None) -> None:
         """Constructor for the :class:`Downloader` class."""
+        self.download_folder = None
+        self.root_folder = None
+        self.filing_storage = None
+
         if download_folder is None:
             self.download_folder = Path.cwd()
         elif isinstance(download_folder, Path):
@@ -57,9 +61,14 @@ class Downloader:
         else:
             self.download_folder = Path(download_folder).expanduser().resolve()
 
-        Path(self.download_folder).mkdir(parents=True, exist_ok=True)
-        self.filing_storage: uc.FilingStorage = uc.FilingStorage(self.download_folder)
+        self.root_folder = Path(self.download_folder) / ROOT_SAVE_FOLDER_NAME  
+        self.root_folder.mkdir(parents=True, exist_ok=True)
+        self.filing_storage: uc.FilingStorage = uc.FilingStorage(self.root_folder)
 
+
+    def __repr__(self) -> str:
+        #TODO: display count of urls queried, count filings downloaded by type
+        pass
 
     def get_sec_latest_filings_detail_page(self, file_type:str) -> str:
         """Get the Filing Detail page urls for the most-recent filings.
@@ -143,6 +152,8 @@ class Downloader:
         self.filing_storage.add_new_list( NewFilingList )
         return len(NewFilingList) 
 
+    def get_by_url(self, list_of_urls):
+        pass
 
     def get(
         self,

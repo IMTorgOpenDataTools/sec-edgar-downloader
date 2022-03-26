@@ -50,7 +50,7 @@ class AccessionNumber:
         self.parse_accession_number(accession_number)
         self.accession_number = accession_number
     
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         return self.get_accession_number()
 
     def parse_accession_number(self, accession_number: str = None) -> dict[str, str]:
@@ -133,6 +133,10 @@ class Filing:
             self._get_filing_document_all_urls()
         except:
             print('log: unable to get all filing docs urls')
+
+    def __repr__(self) -> str:
+        rec = self.get_short_record()
+        return rec.__repr__()
 
     @classmethod
     def from_accession_number(cls, accession_number: AccessionNumber) -> None:
@@ -288,6 +292,29 @@ class Filing:
         pass
 
 
+    def get_short_record(self):
+        """Convert some Filing data into record for ingest to dataframe"""
+        rec = None
+        if self.filing_metadata:
+            asdict = self.filing_metadata._asdict()
+            rec = {k:v for k,v in asdict.items() if (k != 'document_metadata_list' and 'url' not in k)}
+            rec['Type'] = self.file_type
+            rec['file_date'] = self.file_date
+            rec['document_metadata_list'] = list(set([doc.Type for doc in asdict['document_metadata_list']]))
+        return rec
+
+
+    def get_complete_record(self):
+        """Convert all Filing data into record for ingest to dataframe"""
+        rec = None
+        if self.filing_metadata:
+            asdict = self.filing_metadata._asdict()
+            rec = {k:v for k,v in asdict.items() }
+            rec['Type'] = self.file_type
+            rec['file_date'] = self.file_date
+        return rec
+
+
 
 
 
@@ -312,6 +339,9 @@ class FilingStorage:
             self.dump_to_pickle()
             print('log: created file for storing Filings list')
 
+    def __repr__(self):
+        cnt = len(self.get_list())
+        return f"FilingStorage with {cnt} files"
 
     def dump_to_pickle(self):
         """Dumps so that pickled data can be loaded with Python 3.4 or newer"""
@@ -338,6 +368,16 @@ class FilingStorage:
         return self.__FilingList
 
 
+    def get_dataframe(self, mode='short'):
+        match mode:
+            case 'short':
+                list_of_dicts = [rec.get_short_record() for rec in self.__FilingList if isinstance(rec.get_short_record(), dict)]
+            case 'long':
+                list_of_dicts = [rec.get_complete_record() for rec in self.__FilingList]
+        df = pd.DataFrame(list_of_dicts)
+        return df
+
+
     def set_list(self, new_list):
         if len(new_list) > 0 and type(new_list) == List[FilingMetadata] and len(self.__FilingList) < 1:
             self.__FilingList = new_list
@@ -352,7 +392,6 @@ class Firm():
 
     TODO: __repr__() method for listing
     """
-
     __ciks = set()
     
     def __init__(self, firm_name=None, ticker=None, cik=None):
@@ -393,17 +432,15 @@ class Firm():
         if self._cik in Firm.__ciks:
             raise ValueError('firm previously created')
         elif self._cik == None:
-            raise ValueError('firm not registered at sec')
+            raise ValueError('firm not registered at sec: no cik is found')
         else:
             Firm.__ciks.add(self._cik)
 
 
     def __repr__(self) -> str:
         val = self.get_info(info='name') 
-        if val != None:
-            return val
-        else:
-            return 'None'
+        return val if val != None else 'None'
+            
 
     def __get_list_of_all_firms__(self):
         return [ o for o in gc.get_objects() if isinstance(o, Firm)]
@@ -451,6 +488,7 @@ class Firm():
                 rtn_item[str(key)] = result[0][idx]
             return rtn_item
         
+
     def _get_info_from_ticker(self, ticker):
             url = 'https://www.sec.gov/files/company_tickers_exchange.json'
             resp = requests.get(url)
@@ -465,10 +503,12 @@ class Firm():
 
             return rtn_item                  
         
+
     def get_reports_count(self):
         #TODO: check_reports_in_cache
         cnt = len(self._reports)
         return cnt
+
 
     def get_insider_transactions(self):
         #TODO: https://www.sec.gov/cgi-bin/own-disp?action=getissuer&CIK=0001084869
