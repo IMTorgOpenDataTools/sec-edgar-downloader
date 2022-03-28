@@ -5,6 +5,7 @@ name = "pypi"
 
 [packages]
 rapidfuzz = "*"
+ordered-set = "*"
 
 [dev-packages]
 

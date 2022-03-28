@@ -11,7 +11,8 @@ import gc
 from bs4 import BeautifulSoup
 import pandas as pd
 import numpy as np
-from typing import ClassVar, Dict, List, Optional, Tuple, Union
+from typing import ClassVar, Dict, List, OrderedDict, Set, Optional, Tuple, Union
+from ordered_set import OrderedSet
 from rapidfuzz import process, fuzz
 
 #from ._utils import generate_random_user_agent
@@ -31,6 +32,7 @@ from ._constants import (
     SEC_EDGAR_SEARCH_API_ENDPOINT,
     SUPPORTED_FILINGS
 )
+from FilingStorage import FilingStorage
 
 
 
@@ -135,7 +137,7 @@ class Filing:
             print('log: unable to get all filing docs urls')
 
     def __repr__(self) -> str:
-        rec = self.get_short_record()
+        rec = self.get_file_record()
         return rec.__repr__()
 
     @classmethod
@@ -292,96 +294,32 @@ class Filing:
         pass
 
 
-    def get_short_record(self):
-        """Convert some Filing data into record for ingest to dataframe"""
+    def get_file_record(self):
+        """Convert some Filing data into record for ingest to dataframe."""
         rec = None
         if self.filing_metadata:
             asdict = self.filing_metadata._asdict()
             rec = {k:v for k,v in asdict.items() if (k != 'document_metadata_list' and 'url' not in k)}
-            rec['Type'] = self.file_type
+            rec['file_type'] = self.file_type
             rec['file_date'] = self.file_date
-            rec['document_metadata_list'] = list(set([doc.Type for doc in asdict['document_metadata_list']]))
+            rec['doc_types'] = list(set([doc.Type for doc in asdict['document_metadata_list']]))
         return rec
 
 
-    def get_complete_record(self):
-        """Convert all Filing data into record for ingest to dataframe"""
-        rec = None
+    def get_document_record_list(self):
+        """Convert all Filing data into record for ingest to dataframe."""
+        result = []
         if self.filing_metadata:
-            asdict = self.filing_metadata._asdict()
-            rec = {k:v for k,v in asdict.items() }
-            rec['Type'] = self.file_type
-            rec['file_date'] = self.file_date
-        return rec
-
-
-
-
-
-
-class FilingStorage:
-    """Functionality for maintaining a list of Filings as a binary file
-    in a directory.
-    
-    param: FilingList
-    param: dir_path
-    """
-
-    _file_name = 'filing_storage.pickle'
-    
-    def __init__(self, dir_path:Path):
-        self.file_path = Path.joinpath(dir_path, self._file_name) 
-        self.__FilingList:List[FilingMetadata] = []
-        
-        if Path.exists(self.file_path) and Path.is_file(self.file_path):
-            self.load_from_pickle()
-        else:
-            self.dump_to_pickle()
-            print('log: created file for storing Filings list')
-
-    def __repr__(self):
-        cnt = len(self.get_list())
-        return f"FilingStorage with {cnt} files"
-
-    def dump_to_pickle(self):
-        """Dumps so that pickled data can be loaded with Python 3.4 or newer"""
-        with open(self.file_path, 'wb') as File:
-            pickle.dump(self.__FilingList, File, protocol=4)
-        print('log: updated filing storage')
-
-
-    def load_from_pickle(self):
-        """Load the pickle file with Python 3.4 or newer"""
-        with open(self.file_path, 'rb') as File:
-            self.__FilingList = pickle.load(File)
-        print(f'log: loaded Filing list from file: {self.file_path}')
-
-
-    def add_new_list(self, new_list:List[FilingMetadata]):
-        if type(new_list) == list:
-            unique_list = list(set(new_list))
-            self.__FilingList.extend(unique_list)   
-        self.dump_to_pickle()
-
-
-    def get_list(self):
-        return self.__FilingList
-
-
-    def get_dataframe(self, mode='short'):
-        match mode:
-            case 'short':
-                list_of_dicts = [rec.get_short_record() for rec in self.__FilingList if isinstance(rec.get_short_record(), dict)]
-            case 'long':
-                list_of_dicts = [rec.get_complete_record() for rec in self.__FilingList]
-        df = pd.DataFrame(list_of_dicts)
-        return df
-
-
-    def set_list(self, new_list):
-        if len(new_list) > 0 and type(new_list) == List[FilingMetadata] and len(self.__FilingList) < 1:
-            self.__FilingList = new_list
-
+            for doc in self.filing_metadata.document_metadata_list:
+                asdict = doc._asdict()
+                rec = {k:v for k,v in asdict.items()}
+                rec['cik'] = self.short_cik
+                rec['accession_number'] = self.accession_number
+                rec['file_type'] = self.file_type
+                rec['file_date'] = self.file_date
+                rec['yr-month'] = f'{self.file_date.year}-{self.file_date.month}'
+                result.append(rec)
+        return result
 
 
 
@@ -445,6 +383,11 @@ class Firm():
     def __get_list_of_all_firms__(self):
         return [ o for o in gc.get_objects() if isinstance(o, Firm)]
 
+
+    @classmethod
+    def get_ciks(cls):
+        return list(cls.__ciks)
+
     
     def get_info(self, info='all'):
         """Return all or specific firm information from attributes"""
@@ -502,7 +445,7 @@ class Firm():
                 rtn_item[str(key)] = result[0][idx]
 
             return rtn_item                  
-        
+
 
     def get_reports_count(self):
         #TODO: check_reports_in_cache

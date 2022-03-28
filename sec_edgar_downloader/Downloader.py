@@ -70,6 +70,7 @@ class Downloader:
         #TODO: display count of urls queried, count filings downloaded by type
         pass
 
+
     def get_sec_latest_filings_detail_page(self, file_type:str) -> str:
         """Get the Filing Detail page urls for the most-recent filings.
         This list is updated every 10min.
@@ -149,11 +150,25 @@ class Downloader:
                         ] 
 
         # Get number of unique accession numbers downloaded
-        self.filing_storage.add_new_list( NewFilingList )
+        #TODO: add records individually, check each to ensure uniquness, else discard
+        self.filing_storage.add_record_list( NewFilingList )
         return len(NewFilingList) 
 
-    def get_by_url(self, list_of_urls):
+
+    def search_filings(idx, file_type):
+        """TODO: Search terms on files."""
         pass
+
+
+    def load_documents(documents):
+        """TODO: Load the documents into memory as list of bs4."""
+        pass
+
+
+    def get_by_url(self, list_of_urls):
+        """TODO: Simple download files using list of urls."""
+        pass
+
 
     def get(
         self,
