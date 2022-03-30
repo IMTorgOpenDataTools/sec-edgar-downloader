@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+from re import L
+import copy
 
 import requests
 import json
@@ -12,13 +14,9 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import numpy as np
 from typing import ClassVar, Dict, List, OrderedDict, Set, Optional, Tuple, Union
-from ordered_set import OrderedSet
+from collections import OrderedDict
+#from ordered_set import OrderedSet
 from rapidfuzz import process, fuzz
-
-import os
-import subprocess
-import mmap
-import re
 
 #from ._utils import generate_random_user_agent
 from ._constants import (
@@ -37,6 +35,7 @@ from ._constants import (
     SEC_EDGAR_SEARCH_API_ENDPOINT,
     SUPPORTED_FILINGS
 )
+from . import UrlComponent as uc
 
 
 
@@ -57,7 +56,7 @@ class FilingStorage:
     
     def __init__(self, dir_path:Path):
         self.file_path = Path.joinpath(dir_path, self._file_name) 
-        self.__FilingSet:OrderedSet[FilingMetadata] = []
+        self.__FilingSet:OrderedDict[FilingMetadata] = OrderedDict()
         
         if Path.exists(self.file_path) and Path.is_file(self.file_path):
             self.load_from_pickle()
@@ -66,7 +65,7 @@ class FilingStorage:
             print('log: created file for storing Filings list')
 
     def __repr__(self):
-        cnt = len(self.get_all_records())
+        cnt = len(self.__FilingSet)
         return f"FilingStorage with {cnt} files"
 
     def dump_to_pickle(self):
@@ -82,39 +81,115 @@ class FilingStorage:
             self.__FilingSet = pickle.load(File) 
         print(f'log: loaded Filing list from file: {self.file_path}')
 
+    '''
+    def check_record_exists(self,
+                            filing,
+                            ticker_or_cik,
+                            after):
+        """TODO:check records before spending time getting there urls."""
+        cnt = len(self.get_all_records())
+        if cnt < 0:
+            df = self.get_dataframe(mode='file')
+            sel1 = df[df['file_type']==filing & df['ticker']==ticker_or_cik & df['file_date']>=after]
+            if sel1.shape[0] > 0:
+                pass
+        pass'''
 
-    def add_record(self, record:FilingMetadata):
-        """Add a single record"""
-        if type(record) == FilingMetadata:
-            self.__FilingSet.add(record)  
+
+    def add_record(self, record:uc.Filing = None, rec_lst:List[uc.Filing] = None):
+        """Add a single record or a list of records"""
+        def add_rec(record):
+            key = record.create_key()
+            self.__FilingSet[key] = record
+            return None
+
+        if type(record) == uc.Filing and record.short_cik and record.accession_number:
+            add_rec(record)
+        elif type(rec_lst) == list and len(rec_lst) > 0:
+            result = [add_rec(record) for record in rec_lst]
+            print(f"Added {len(result)} records.")
+        else:
+            raise TypeError
         self.dump_to_pickle()
+        return None
 
 
-    def add_record_list(self, record_list:List[FilingMetadata]):
-        """Add a list of records.  Preferable because of latency in IO operation."""
-        if type(record_list) == List[FilingMetadata]:
-            ordr_set = OrderedSet(record_list)
-            self.__FilingSet.update(ordr_set)  
-        self.dump_to_pickle()
+    def get_all_records(self, mode='file'):
+        if mode == 'file':
+            return self.__FilingSet
+        elif mode == 'document':
+            dict_of_docs = {}
+            for k,v in self.__FilingSet.items():
+                for doc in v.document_metadata_list:
+                    doc_key = k + '|' + str(doc.Seq)
+                    dict_of_docs[doc_key] = doc
+            return dict_of_docs
+        else:
+            raise TypeError
+        return None
 
-    def get_all_records(self):
-        """Return an OrderedSet of all records."""
-        return self.__FilingSet
+    
+    def get_record(self, idx_or_key):
+        """Find a record in the OrderedDict by index or key."""
+        if type(idx_or_key) == str:
+            return self.__FilingSet[idx_or_key]
+        elif type(idx_or_key) == int:
+            return list(self.__FilingSet.items())[idx_or_key]
+        else:
+            TypeError
 
 
+    def get_document_in_record(self, idx_or_list):
+        """Return the Doc(ument) from within records."""
+        dict_of_docs = {}
+        for k,v in self.__FilingSet.items():
+            for doc in v.document_metadata_list:
+                doc_key = k + '|' + str(doc.Seq)
+                dict_of_docs[doc_key] = doc
+        lst = list(dict_of_docs.items())
+        if type(idx_or_list)==int:
+            return lst[idx_or_list]
+        elif type(idx_or_list)==list:
+            return [lst[idx] for idx in idx_or_list]
+        else:
+            raise TypeError
+
+
+    def modify_record(self, orig_record, new_record):
+        """This is necessary because you cannot set value by index."""
+        key = orig_record.create_key()
+        self.__FilingSet.pop(key)
+        self.__FilingSet[key] = new_record
+        return None
+
+    
+    def modify_document_in_record(self, file_key, orig_document, new_document):
+        """Modify a record's document with a new one."""
+        orig_rec = self.__FilingSet[file_key]
+        new_rec = copy.deepcopy(orig_rec)
+        idx = new_rec.document_metadata_list.index(orig_document)
+        if idx and type(new_document) == DocumentMetadata:
+            new_rec.document_metadata_list[idx] = new_document
+            self.__FilingSet.pop(file_key)
+            self.__FilingSet[file_key] = new_rec
+        else:
+            raise TypeError
+        return None
+
+    
     def get_dataframe(self, mode='file'):
         """Return a dataframe of all records."""
         match mode:
             case 'file':
-                list_of_dicts = [rec.get_file_record() for rec in self.__FilingSet if isinstance(rec.get_file_record(), dict)]
+                list_of_dicts = [rec.get_file_record() for rec in list(self.__FilingSet.values()) if isinstance(rec.get_file_record(), dict)]
             case 'document':
                 list_of_dicts = []
-                for rec in self.__FilingSet:
+                for rec in list(self.__FilingSet.values()):
                     list_of_dicts.extend( rec.get_document_record_list() )
         df = pd.DataFrame(list_of_dicts)
         return df
 
-
+    '''
     def sync_with_filesystem(self):
         """Uses the downloaded files to determine correctness."""
         pass
@@ -140,60 +215,4 @@ class FilingStorage:
                 FS_Location = save_path
                 result_list.append( (rtn_doc, FS_Location) )
         return result_list
-
-
-    def load_documents(self, documents):
-        """Load all staged documents into memory."""
-        return_list = []
-        for doc in documents:
-            txt = doc[1].read_bytes()
-            soup = BeautifulSoup(txt, 'lxml')
-            return_list.append(soup)
-        return return_list
-
-
-    def search_docs_for_terms(search_list = [r'allowance', r'credit loss'], ignore_case=True, file_ext='htm'):
-        """Search through files for specific regex term(s) and obtain snippet of surrounding text.
-
-        param: search_list
-        return: {file, index, text}
-        """
-        search_term = '|'.join(search_list)            #gives this r'allowance|credit|loss'
-        regex = bytes(search_term, encoding='utf8')    #equivalent to regex = rb"\bcredit|loss\b"
-        START = 50
-        END = 50
-
-        re_term = re.compile(regex)
-        dir_path = str( dl.download_folder / 'sec-edgar-filings')
-        total_files = sum([len(files) for r, d, files in os.walk(dir_path)])
-
-        cmd = ['grep','-Ei', search_term, '-rnwl', dir_path] if ignore_case else ['grep','-E', search_term, '-rnwl', dir_path]
-        hits = subprocess.run(cmd, capture_output=True)
-        files = hits.stdout.decode('utf-8').split('\n')
-        files_not_empty = [file for file in files if (file != '' and file_ext in file.split('.')[1])]
-        print(f'log: number of files matching criteria: {len(files_not_empty)} of {total_files}')
-
-        results = []
-        if len(files_not_empty) > 0:
-            for file in files_not_empty:
-                with open(file) as f:
-                    with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mmap_obj:
-                        for term in re_term.finditer(mmap_obj):
-
-                            start_idx = term.start() - START if term.start() - START >= 0 else 0
-                            end_idx = term.end() + END if term.end() + END < len(mmap_obj) else len(mmap_obj)
-                            text = mmap_obj[ start_idx : end_idx].decode('utf8')
-                            start_format = START
-                            end_format = len(text) - END
-                            rec = {'file':file, 
-                                   'index': term.start(), 
-                                   'text': text, 
-                                   'start_format':start_format, 
-                                   'end_format':end_format 
-                                  }
-                            results.append( rec )
-
-            print(f'log: number of lines matching criteria: {len(results)}')
-            return results
-        else:
-            return None
+        '''

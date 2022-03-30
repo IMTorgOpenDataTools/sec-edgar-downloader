@@ -12,12 +12,12 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import numpy as np
 from typing import ClassVar, Dict, List, OrderedDict, Set, Optional, Tuple, Union
-from ordered_set import OrderedSet
+#from ordered_set import OrderedSet
 from rapidfuzz import process, fuzz
 
 #from ._utils import generate_random_user_agent
 from ._constants import (
-    FilingMetadata,
+    #FilingMetadata,
     DocumentMetadata,
     get_number_of_unique_filings,
     generate_random_user_agent,
@@ -32,7 +32,7 @@ from ._constants import (
     SEC_EDGAR_SEARCH_API_ENDPOINT,
     SUPPORTED_FILINGS
 )
-from FilingStorage import FilingStorage
+
 
 
 
@@ -90,8 +90,8 @@ class AccessionNumber:
         return {'short_cik': self.short_cik, 'year': self.year, 'annual_sequence': self.annual_sequence}    
     
     def get_accession_number(self) -> str:
-        """Get the 'accession number' in long-form (leading zeros)."""
-        return self.accession_number
+        """Get the 'accession number' in long-form (leading zeros) with dashes."""
+        return str(self.accession_number)
 
     def get_nodash_accession_number(self) -> str:
         """Get the 'accession number' in long-form (leading zeros) without dashes."""
@@ -121,20 +121,31 @@ class Filing:
 
     def __init__(self, short_cik:str, accession_number:AccessionNumber, file_type:str = None, file_date:str = None) -> None:
         self.short_cik = short_cik
-        self.file_type = file_type
-        self.file_date = file_date         
-        self.filing_metadata = None
         self.accession_number = accession_number
+        self.file_type = file_type
+        self.file_date = file_date
+
+        self.document_metadata_list = []
+
+        self.filing_details_filename = None
+        self.full_submission_url = None
+        self.filing_details_url = None
+        self.filing_detail_page_url = None
+        self.xlsx_financial_report_url = None
+        self.html_exhibits_url = None
+        self.xbrl_instance_doc_url = None
+        self.zip_compressed_file_url = None
+
 
         if self.accession_number == None:
             try:
                 self.accession_number = self.get_accession_number()
             except:
                 print('log: unable to get accession_number')
-        try:
-            self._get_filing_document_all_urls()
-        except:
-            print('log: unable to get all filing docs urls')
+        #try:
+        self._get_filing_document_all_urls()
+        #except:
+        #    print('log: unable to get all filing docs urls')
 
     def __repr__(self) -> str:
         rec = self.get_file_record()
@@ -203,8 +214,8 @@ class Filing:
         row = df.loc[  (df['Filing Date'] == file_date)  ]
 
         item = row['Description']
-        accno = str(item.values).split('Acc-no: ')[1].split('\\')[0]
-        return AccessionNumber(accno)
+        acc_no = str(item.values).split('Acc-no: ')[1].split('\\')[0]
+        return AccessionNumber(acc_no)
 
 
     def _get_filing_document_all_urls(self) -> None:
@@ -273,53 +284,57 @@ class Filing:
         url_xlsx = self._url_filing_document.format(self.short_cik, acc_no_noformat, 'Financial_Report.xlsx')
         url_exhibit = base_url + df[df['Type'].isin(['99.1'])]['URL'].values[0] if df[df['Type'].isin(['99.1'])].shape[0] > 0 else None
 
-        self.filing_metadata = FilingMetadata(
-            cik = self.short_cik,
-            ticker = '',
-            accession_number = self.accession_number,
-            document_metadata_list = tmp_documents,
-            filing_details_filename = '',
-            full_submission_url = url_text,
-            filing_details_url = url_ixbrl,
+        self.document_metadata_list.extend( tmp_documents ),
+
+        self.filing_details_filename = None,
+        self.full_submission_url = url_text,
+        self.filing_details_url = url_ixbrl,
                 
-            filing_detail_page_url = filled_url,
-            xlsx_financial_report_url = url_xlsx,
-            html_exhibits_url = url_exhibit,
-            xbrl_instance_doc_url = url_xbrl,
-            zip_compressed_file_url = url_zip
-            )
+        self.filing_detail_page_url = filled_url,
+        self.xlsx_financial_report_url = url_xlsx,
+        self.html_exhibits_url = url_exhibit,
+        self.xbrl_instance_doc_url = url_xbrl,
+        self.zip_compressed_file_url = url_zip
+
+        return None
+
+
+    def create_key(self):
+        """Create key for use with dict."""
+        return self.short_cik + '|' + self.accession_number.get_accession_number()
+
 
     def set_accession_number(self, accession_number: str) -> None:
+        """Setter for the accession number."""
         self.accession_number = AccessionNumber(accession_number)
-        pass
+        return None
 
-
+    
     def get_file_record(self):
-        """Convert some Filing data into record for ingest to dataframe."""
+        """Convert some Filing data into (dict) record for display and query."""
         rec = None
-        if self.filing_metadata:
-            asdict = self.filing_metadata._asdict()
-            rec = {k:v for k,v in asdict.items() if (k != 'document_metadata_list' and 'url' not in k)}
-            rec['file_type'] = self.file_type
-            rec['file_date'] = self.file_date
-            rec['doc_types'] = list(set([doc.Type for doc in asdict['document_metadata_list']]))
+        asdict = self.__dict__
+        rec = {k:v for k,v in asdict.items() if (k != 'document_metadata_list' and 'url' not in k)}
+        rec['file_type'] = self.file_type
+        rec['file_date'] = self.file_date
+        rec['doc_types'] = list(set([doc.Type for doc in asdict['document_metadata_list']]))
         return rec
 
-
+    
     def get_document_record_list(self):
         """Convert all Filing data into record for ingest to dataframe."""
         result = []
-        if self.filing_metadata:
-            for doc in self.filing_metadata.document_metadata_list:
-                asdict = doc._asdict()
-                rec = {k:v for k,v in asdict.items()}
-                rec['cik'] = self.short_cik
-                rec['accession_number'] = self.accession_number
-                rec['file_type'] = self.file_type
-                rec['file_date'] = self.file_date
-                rec['yr-month'] = f'{self.file_date.year}-{self.file_date.month}'
-                result.append(rec)
+        for doc in self.document_metadata_list:
+            asdict = doc._asdict()
+            rec = {k:v for k,v in asdict.items()}
+            rec['short_cik'] = self.short_cik
+            rec['accession_number'] = self.accession_number
+            rec['file_type'] = self.file_type
+            rec['file_date'] = self.file_date
+            rec['yr-month'] = f'{self.file_date.year}-{self.file_date.month}'
+            result.append(rec)
         return result
+        
 
 
 

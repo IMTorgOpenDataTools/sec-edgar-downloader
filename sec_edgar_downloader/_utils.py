@@ -6,6 +6,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
+from types import SimpleNamespace
 from urllib.parse import urljoin
 
 import requests
@@ -175,7 +176,7 @@ def get_filing_urls_to_download(
 ) -> List[FilingMetadata]:
     filings_to_fetch: List[FilingMetadata] = []
     start_index = 0
-
+    """CHECKED """
 
     try:
         while len(filings_to_fetch) < num_filings_to_download:
@@ -341,9 +342,13 @@ def _check_params(
 
 
 
-def download_urls(download_folder, filing, list_of_document_urls):
+def download_urls(download_folder, filing_storage, list_of_doc_tuples):
+    """Download document given only a list of document urls.  Update the File records.
+
+    :param list_of_doc_tuples: these should be in the form of (key, DocumentMetadata), where key is 'cik|acc_no|doc_seq'
+    
+    """
     base_url = 'https://www.sec.gov'
-    fs_path = []
 
     client = requests.Session()
     client.mount("http://", HTTPAdapter(max_retries=retries))
@@ -353,37 +358,43 @@ def download_urls(download_folder, filing, list_of_document_urls):
         "Accept-Encoding": "gzip, deflate",
         "Host": "www.sec.gov",
         }
-    for file in list_of_document_urls:
-        if file.file_type == filing:
-            for doc in file.filing_metadata.document_metadata_list:
-                if '99.1' in str(doc.Type):
-                    try:
-                        url = base_url + doc.URL
-                        resp = client.get(url, headers=headers)
-                        resp.raise_for_status()
-                        filing_text = resp.content
 
-                        # Create all parent directories as needed and write content to file
-                        save_path = (
-                            download_folder
-                            / ROOT_SAVE_FOLDER_NAME
-                            / file.short_cik
-                            / file.file_type
-                            / file.accession_number.__str__()
-                            / doc.Document
-                            )
-                        save_path.parent.mkdir(parents=True, exist_ok=True)
-                        save_path.write_bytes(filing_text) 
-                        #TODO: doc.FS_Location = save_path            
-                        # Prevent rate limiting
-                        time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)             
-                    except requests.exceptions.HTTPError as e:  # pragma: no cover
-                            print(
-                                "Skipping full submission download for "
-                                f"'{doc.URL}' due to network error: {e}."
-                            )
-    #TODO:update docs with location of downloaded file
-    return list_of_document_urls
+    result_doc_list = []
+    for key, doc in list_of_doc_tuples:
+        cik, acc_no, doc_seq = key.split('|')
+        file_key = cik + '|' + acc_no
+        if doc.FS_Location == '':
+            try:
+                url = base_url + doc.URL
+                resp = client.get(url, headers=headers)
+                resp.raise_for_status()
+                filing_text = resp.content
+
+                # Create all parent directories as needed and write content to file
+                save_path = (
+                    download_folder
+                    / ROOT_SAVE_FOLDER_NAME
+                    / cik
+                    / doc.Type
+                    / acc_no
+                    / doc.Document
+                    )
+                save_path.parent.mkdir(parents=True, exist_ok=True)
+                save_path.write_bytes(filing_text) 
+
+                new_doc = doc._replace(FS_Location = save_path)
+                filing_storage.modify_document_in_record(file_key, doc, new_doc)
+                result_doc_list.append(new_doc)            
+                # Prevent rate limiting
+                time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)             
+            except requests.exceptions.HTTPError as e:  # pragma: no cover
+                    print(
+                        "Skipping full submission download for "
+                        f"'{url}' due to network error: {e}."
+                    )
+        else:
+            result_doc_list.append(doc) 
+    return result_doc_list
         
 
 

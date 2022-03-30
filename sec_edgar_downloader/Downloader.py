@@ -19,6 +19,7 @@ from ._utils import (
     validate_date_format,
 )
 from . import UrlComponent as uc
+from . import FilingStorage as fs
 
 
 
@@ -63,7 +64,7 @@ class Downloader:
 
         self.root_folder = Path(self.download_folder) / ROOT_SAVE_FOLDER_NAME  
         self.root_folder.mkdir(parents=True, exist_ok=True)
-        self.filing_storage: uc.FilingStorage = uc.FilingStorage(self.root_folder)
+        self.filing_storage: fs.FilingStorage = fs.FilingStorage(self.root_folder)
 
 
     def __repr__(self) -> str:
@@ -134,6 +135,14 @@ class Downloader:
             query = query,
         )
 
+        '''
+        #TODO:complete this functionality, convert to df and query on params
+        check = self.filing_storage.check_record_exists(
+            filing = filing,
+            ticker_or_cik = ticker_or_cik,
+            after = after,
+        )'''
+
         filings_to_fetch = get_filing_urls_to_download(
             filing,
             ticker_or_cik,
@@ -143,31 +152,31 @@ class Downloader:
             include_amends,
             query,
         )
-        NewFilingList = [ uc.Filing(short_cik = filing.cik, 
+
+        NewFilingList = []
+        for filing in filings_to_fetch:
+            new_file = uc.Filing(short_cik = filing.cik,
                                     accession_number = uc.AccessionNumber(filing.accession_number)
                                     ) 
-                        for filing in  filings_to_fetch
-                        ] 
+            NewFilingList.append(new_file)
 
         # Get number of unique accession numbers downloaded
-        #TODO: add records individually, check each to ensure uniquness, else discard
-        self.filing_storage.add_record_list( NewFilingList )
-        return len(NewFilingList) 
+        self.filing_storage.add_record(rec_lst = NewFilingList)
+        return None
 
 
-    def search_filings(idx, file_type):
-        """TODO: Search terms on files."""
-        pass
+    def get_documents_from_url_list(self, list_of_doc_tuples):
+        """Simple download files using list of urls.
 
-
-    def load_documents(documents):
-        """TODO: Load the documents into memory as list of bs4."""
-        pass
-
-
-    def get_by_url(self, list_of_urls):
-        """TODO: Simple download files using list of urls."""
-        pass
+        :param filing: filing type to download (e.g. 8-K).
+        :param list_of_document_urls: simple urls (e.g. )
+        :return: status of download (downloaded -previously, -current, failed to download)
+        """
+        result_doc_list = download_urls(self.download_folder, 
+                                        self.filing_storage, 
+                                        list_of_doc_tuples
+                                        )
+        return result_doc_list
 
 
     def get(
