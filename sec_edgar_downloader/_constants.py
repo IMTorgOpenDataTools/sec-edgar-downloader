@@ -5,6 +5,7 @@ from typing import List
 from faker import Faker
 
 
+'''
 # Object for storing metadata about filings that will be downloaded.
 FilingMetadata = namedtuple(
     "FilingMetadata",
@@ -24,7 +25,7 @@ FilingMetadata = namedtuple(
         "xbrl_instance_doc_url",          #must scrape
         "zip_compressed_file_url"
     ],
-)
+)'''
 
 DocumentMetadata = namedtuple(
     "DocumentMetadata",
