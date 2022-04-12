@@ -67,7 +67,7 @@ class FilingStorage:
 
     def __repr__(self):
         cnt = len(self.__FilingSet)
-        return f"FilingStorage with {cnt} files"
+        return f"FilingStorage with {cnt} filing records"
 
     def dump_to_pickle(self):
         """Dumps so that pickled data can be loaded with Python 3.4 or newer"""
@@ -167,7 +167,7 @@ class FilingStorage:
     def modify_document_in_record(self, file_key, orig_document, new_document):
         """Modify a record's document with a new one."""
         orig_rec = self.__FilingSet[file_key]
-        new_rec = copy.deepcopy(orig_rec)
+        new_rec = copy.deepcopy( orig_rec )
         idx = new_rec.document_metadata_list.index(orig_document)
         if idx and type(new_document) == DocumentMetadata:
             new_rec.document_metadata_list[idx] = new_document
@@ -190,12 +190,43 @@ class FilingStorage:
         df = pd.DataFrame(list_of_dicts)
         return df
 
-    '''
+    
     def sync_with_filesystem(self):
-        """Uses the downloaded files to determine correctness."""
-        pass
+        """Uses the downloaded files to determine correctness of filings' FS_Location.
+        This is useful when the FilingStorage (`self.__FilingSet`) becomes corrupt.
+        """
+
+        def get_all_file_path(dir):
+            #get all files
+            walk = [file for file in os.fwalk(dir)]
+            max_depth = max([file[3] for file in walk])
+            docs = {}
+            for file in walk:
+                if file[3]==max_depth:
+                    for doc in file[2]:
+                        docs.update({doc : Path(file[0]) / doc})
+            return docs
+
+        cnt = 0
+        dir = self.file_path.parent
+        downloaded_docs = get_all_file_path(dir)
+        #get all documents
+        recs = copy.deepcopy( list(self.get_all_records().items()) )
+        for rec in recs:
+            file_key = rec[0]
+            for doc in rec[1].document_metadata_list:
+                doc_name = doc.Document.split()[0]
+                if doc_name in downloaded_docs.keys():
+                    new_doc = doc._replace(FS_Location = downloaded_docs[doc_name])
+                    self.modify_document_in_record(file_key, doc, new_doc)
+                    cnt += 1
+        self.dump_to_pickle()
+        print(f'There were {cnt} document FS_Location synced with filesystem')
+        return None
 
 
+
+    '''
     def search_filings(self, idx, file_type):
         """TODO: this is fucked up"""
         result_list = []
