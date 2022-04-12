@@ -19,7 +19,7 @@ from rapidfuzz import process, fuzz
 from ._constants import (
     #FilingMetadata,
     DocumentMetadata,
-    get_number_of_unique_filings,
+    #get_number_of_unique_filings,
     generate_random_user_agent,
     is_cik,
     DATE_FORMAT_TOKENS,

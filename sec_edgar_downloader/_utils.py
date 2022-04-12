@@ -16,7 +16,7 @@ from urllib3.util.retry import Retry
 
 from ._constants import (
     FilingMetadata,
-    get_number_of_unique_filings,
+    #get_number_of_unique_filings,
     generate_random_user_agent,
     is_cik,
     DATE_FORMAT_TOKENS,
@@ -375,7 +375,7 @@ def download_urls(download_folder, filing_storage, list_of_doc_tuples):
                     download_folder
                     / ROOT_SAVE_FOLDER_NAME
                     / cik
-                    / doc.Type
+                    #/ doc.Type
                     / acc_no
                     / doc.Document
                     )
@@ -393,7 +393,8 @@ def download_urls(download_folder, filing_storage, list_of_doc_tuples):
                         f"'{url}' due to network error: {e}."
                     )
         else:
-            result_doc_list.append(doc) 
+            result_doc_list.append(doc)
+    filing_storage.dump_to_pickle()
     return result_doc_list
         
 

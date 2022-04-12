@@ -5,7 +5,7 @@ from typing import List
 from faker import Faker
 
 
-'''
+
 # Object for storing metadata about filings that will be downloaded.
 FilingMetadata = namedtuple(
     "FilingMetadata",
@@ -25,7 +25,14 @@ FilingMetadata = namedtuple(
         "xbrl_instance_doc_url",          #must scrape
         "zip_compressed_file_url"
     ],
+)
+'''
+FilingMetadata = namedtuple(
+    "FilingMetadata",
+    [ 'does_this_get_used'
+    ]
 )'''
+
 
 DocumentMetadata = namedtuple(
     "DocumentMetadata",
@@ -41,8 +48,8 @@ DocumentMetadata = namedtuple(
     ]
 )
 
-def get_number_of_unique_filings(filings: List[FilingMetadata]) -> int:
-    return len({metadata.accession_number for metadata in filings})
+#def get_number_of_unique_filings(filings: List[FilingMetadata]) -> int:
+#    return len({metadata.accession_number for metadata in filings})
 
 # Object for generating fake user-agent strings
 fake = Faker()

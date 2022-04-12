@@ -20,9 +20,9 @@ from rapidfuzz import process, fuzz
 
 #from ._utils import generate_random_user_agent
 from ._constants import (
-    FilingMetadata,
+    #FilingMetadata,
     DocumentMetadata,
-    get_number_of_unique_filings,
+    #get_number_of_unique_filings,
     generate_random_user_agent,
     is_cik,
     DATE_FORMAT_TOKENS,
@@ -56,7 +56,8 @@ class FilingStorage:
     
     def __init__(self, dir_path:Path):
         self.file_path = Path.joinpath(dir_path, self._file_name) 
-        self.__FilingSet:OrderedDict[FilingMetadata] = OrderedDict()
+        #self.__FilingSet:OrderedDict[FilingMetadata] = OrderedDict()
+        self.__FilingSet:OrderedDict = OrderedDict()
         
         if Path.exists(self.file_path) and Path.is_file(self.file_path):
             self.load_from_pickle()

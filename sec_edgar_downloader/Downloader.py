@@ -14,7 +14,7 @@ from ._utils import (
     download_filings,
     _check_params,
     get_filing_urls_to_download,
-    get_number_of_unique_filings,
+    #get_number_of_unique_filings,
     is_cik,
     validate_date_format,
 )
@@ -153,6 +153,7 @@ class Downloader:
             query,
         )
 
+        #TODO: check if filings exists before updating and explain in logger
         NewFilingList = []
         for filing in filings_to_fetch:
             new_file = uc.Filing(short_cik = filing.cik,
@@ -176,6 +177,7 @@ class Downloader:
                                         self.filing_storage, 
                                         list_of_doc_tuples
                                         )
+        ##TODO: `updated` - I need the filing information with the document info
         return result_doc_list
 
 
