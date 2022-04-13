@@ -194,6 +194,8 @@ class FilingStorage:
     def sync_with_filesystem(self):
         """Uses the downloaded files to determine correctness of filings' FS_Location.
         This is useful when the FilingStorage (`self.__FilingSet`) becomes corrupt.
+
+        TODO: add functionality to populate records, if only the downloaded documents are present.
         """
 
         def get_all_file_path(dir):
