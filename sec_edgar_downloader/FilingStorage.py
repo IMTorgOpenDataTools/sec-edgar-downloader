@@ -106,9 +106,13 @@ class FilingStorage:
 
         if type(record) == uc.Filing and record.short_cik and record.accession_number:
             add_rec(record)
+            print(record.short_cik)
         elif type(rec_lst) == list and len(rec_lst) > 0:
             result = [add_rec(record) for record in rec_lst]
             print(f"Added {len(result)} records.")
+        elif record == None:
+            print(f"No record(s) provided.")
+            return None
         else:
             raise TypeError
         self.dump_to_pickle()
@@ -176,6 +180,11 @@ class FilingStorage:
         else:
             raise TypeError
         return None
+
+
+    def get_list(self):
+        """Return a list of all records."""
+        return list(self.__FilingSet.values())
 
     
     def get_dataframe(self, mode='file'):

@@ -71,8 +71,8 @@ def test_get_urls():
     formatted_earliest_after_date = date(2002, 1, 1).strftime(DATE_FORMAT_TOKENS)
 
     filing_type = "8-K"
-    ticker = "WFC"
-    before_date = date(2019, 11, 15).strftime(DATE_FORMAT_TOKENS)
+    ticker = "RY"
+    before_date = date(2020, 12, 31).strftime(DATE_FORMAT_TOKENS)
     include_amends = False
     # num_filings_to_download < number of filings available
     num_filings_to_download = 30
