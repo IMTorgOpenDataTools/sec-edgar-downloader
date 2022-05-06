@@ -230,13 +230,13 @@ class Filing:
                 "From": generate_random_user_agent(),
                 "Accept-Encoding": "gzip, deflate"
             }
-        print(self.accession_number.get_accession_number())
         acc_no_noformat = self.accession_number.get_nodash_accession_number()
         #'https://www.sec.gov/Archives/edgar/data/{short_cik}/{acc_no_noformat}/{acc_no}-index.htm'
         filled_url = self._url_filing_detail_page.format(self.short_cik, acc_no_noformat, str(self.accession_number))
 
         edgar_resp = requests.get(filled_url, headers=headers)
-        edgar_resp.raise_for_status()
+        if edgar_resp.status_code != 200:                           
+            return False
         time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)
         edgar_str = edgar_resp.text
         soup = BeautifulSoup(edgar_str, 'html.parser')
@@ -273,7 +273,7 @@ class Filing:
                             Size=rec.Size,
                             URL=rec.URL,
                             Extension=rec.Extension,
-                            FS_Location=''
+                            FS_Location=None
                             ) for rec in tmp_list ]
 
         base_url = 'https://www.sec.gov'
@@ -296,7 +296,8 @@ class Filing:
         self.xbrl_instance_doc_url = url_xbrl,
         self.zip_compressed_file_url = url_zip
 
-        return None
+        print(f'loaded filing: {self.accession_number.get_accession_number()}')
+        return True
 
 
     def create_key(self):
@@ -341,9 +342,9 @@ class Filing:
 
 
 class Firm():
-    """TODO:The Firm is root for all classes used.
-
-    TODO: __repr__() method for listing
+    """The Firm class accounts for many instantiated Firm objects.
+    
+    TODO:The Firm is root for all classes used.
     """
     __ciks = set()
     
@@ -385,6 +386,7 @@ class Firm():
         if self._cik in Firm.__ciks:
             raise ValueError('firm previously created')
         elif self._cik == None:
+            print(self._name); print(self.ticker)
             raise ValueError('firm not registered at sec: no cik is found')
         else:
             Firm.__ciks.add(self._cik)

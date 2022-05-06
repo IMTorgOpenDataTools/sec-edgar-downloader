@@ -68,8 +68,7 @@ class Downloader:
 
 
     def __repr__(self) -> str:
-        #TODO: display count of urls queried, count filings downloaded by type
-        pass
+        return self.filing_storage.__repr__()
 
 
     def get_sec_latest_filings_detail_page(self, file_type:str) -> str:
@@ -125,6 +124,7 @@ class Downloader:
 
         Usage::
         """
+        # check the query
         filing, ticker_or_cik, amount, after, before, include_amends, query = _check_params(
             filing = filing,
             ticker_or_cik = ticker_or_cik,
@@ -143,6 +143,7 @@ class Downloader:
             after = after,
         )'''
 
+        # get filing urls from the query
         filings_to_fetch = get_filing_urls_to_download(
             filing,
             ticker_or_cik,
@@ -153,17 +154,25 @@ class Downloader:
             query,
         )
 
-        #TODO: check if filings exists before updating and explain in logger
-        NewFilingList = []
+        # add filings to storage if they don't exist
+        new_filing_list = []
+        previously_loaded = []
         for filing in filings_to_fetch:
-            new_file = uc.Filing(short_cik = filing.cik,
+            key = filing.cik + '|' + filing.accession_number
+            test_filing = self.filing_storage.get_record(key)
+            if not test_filing:
+                new_file = uc.Filing(short_cik = filing.cik,
                                     accession_number = uc.AccessionNumber(filing.accession_number)
                                     ) 
-            NewFilingList.append(new_file)
-
-        # Get number of unique accession numbers downloaded
-        self.filing_storage.add_record(rec_lst = NewFilingList)
-        return None
+                new_filing_list.append(new_file)
+            else:
+                previously_loaded.append(filing)
+        self.filing_storage.add_record(rec_lst = new_filing_list)
+        result_filing_dict = {'new': new_filing_list,
+                                'previous': previously_loaded,
+                                'fail': []
+                                }
+        return result_filing_dict
 
 
     def get_documents_from_url_list(self, list_of_doc_tuples):
@@ -173,12 +182,26 @@ class Downloader:
         :param list_of_document_urls: simple urls (e.g. )
         :return: status of download (downloaded -previously, -current, failed to download)
         """
-        result_doc_list = download_urls(self.download_folder, 
+        check_list = []
+        previously_loaded = []
+        for doc in list_of_doc_tuples:
+            cik, accn, seq = doc[0].split('|')
+            key = f'{cik}|{accn}'
+            filing = self.filing_storage.get_record(key)
+            check = [document for document in filing.document_metadata_list if (str(document.Seq) == seq and document.FS_Location == None)]
+            if not check==[]: 
+                check_list.append(doc)
+            else:
+                previously_loaded.append(doc)
+
+        if not check_list==[]:
+            result_doc_dict = download_urls(self.download_folder, 
                                         self.filing_storage, 
-                                        list_of_doc_tuples
+                                        check_list
                                         )
-        ##TODO: `updated` - I need the filing information with the document info
-        return result_doc_list
+            return result_doc_dict
+        else:
+            return None
 
 
     def get(
@@ -258,9 +281,10 @@ class Downloader:
             query,
         )
 
-        if self.filing_storage == None or len(self.filing_storage.get_list()) < 1:
-            print('log: you must run `get_urls()` before downloading the documents')
-            return None
+        if self.filing_storage == None:
+            if len(self.filing_storage.get_list()) < 1:
+                print('log: you must run `get_urls()` before downloading the documents')
+                return None
         else:
             filings_to_fetch = self.filing_storage.get_list()
 

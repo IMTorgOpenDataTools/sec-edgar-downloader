@@ -359,11 +359,13 @@ def download_urls(download_folder, filing_storage, list_of_doc_tuples):
         "Host": "www.sec.gov",
         }
 
-    result_doc_list = []
+    new_doc_list = []
+    previous_doc_list = []
+    fail_doc_list = []
     for key, doc in list_of_doc_tuples:
         cik, acc_no, doc_seq = key.split('|')
         file_key = cik + '|' + acc_no
-        if doc.FS_Location == '':
+        if doc.FS_Location == None:
             try:
                 url = base_url + doc.URL
                 resp = client.get(url, headers=headers)
@@ -384,18 +386,22 @@ def download_urls(download_folder, filing_storage, list_of_doc_tuples):
 
                 new_doc = doc._replace(FS_Location = save_path)
                 filing_storage.modify_document_in_record(file_key, doc, new_doc)
-                result_doc_list.append(new_doc)            
+                new_doc_list.append(new_doc)            
                 # Prevent rate limiting
+                print(f'loaded document: {key}')
                 time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)             
             except requests.exceptions.HTTPError as e:  # pragma: no cover
-                    print(
-                        "Skipping full submission download for "
+                fail_doc_list.append(doc)
+                print("Skipping full submission download for "
                         f"'{url}' due to network error: {e}."
-                    )
+                        )
         else:
-            result_doc_list.append(doc)
+            previous_doc_list.append(doc)
     filing_storage.dump_to_pickle()
-    return result_doc_list
+    result = {'new': new_doc_list,
+                'previous': previous_doc_list,
+                'fail': fail_doc_list}
+    return result
         
 
 
@@ -469,10 +475,9 @@ def download_filings(
                     FILING_FULL_SUBMISSION_FILENAME,
                 )
             except requests.exceptions.HTTPError as e:  # pragma: no cover
-                print(
-                    "Skipping full submission download for "
-                    f"'{filing.accession_number}' due to network error: {e}."
-                )
+                print("Skipping full submission download for "
+                        f"'{filing.accession_number}' due to network error: {e}."
+                        )
 
             if include_filing_details:
                 try:
@@ -487,10 +492,9 @@ def download_filings(
                         resolve_urls=True,
                     )
                 except requests.exceptions.HTTPError as e:  # pragma: no cover
-                    print(
-                        f"Skipping filing detail download for "
-                        f"'{filing.accession_number}' due to network error: {e}."
-                    )
+                    print(f"Skipping filing detail download for "
+                            f"'{filing.accession_number}' due to network error: {e}."
+                            )
     finally:
         client.close()
 

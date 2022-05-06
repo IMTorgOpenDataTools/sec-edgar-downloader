@@ -61,6 +61,7 @@ class FilingStorage:
         
         if Path.exists(self.file_path) and Path.is_file(self.file_path):
             self.load_from_pickle()
+            self.sync_with_filesystem()
         else:
             self.dump_to_pickle()
             print('log: created file for storing Filings list')
@@ -137,9 +138,17 @@ class FilingStorage:
     def get_record(self, idx_or_key):
         """Find a record in the OrderedDict by index or key."""
         if type(idx_or_key) == str:
-            return self.__FilingSet[idx_or_key]
+            if idx_or_key in self.__FilingSet.keys():
+                result = self.__FilingSet[idx_or_key]
+                return result
+            else:
+                TypeError
         elif type(idx_or_key) == int:
-            return list(self.__FilingSet.items())[idx_or_key]
+            if idx_or_key < len( self.__FilingSet.items() ):
+                result = list(self.__FilingSet.items())[idx_or_key]
+                return result
+            else:
+                TypeError
         else:
             TypeError
 
@@ -173,7 +182,7 @@ class FilingStorage:
         orig_rec = self.__FilingSet[file_key]
         new_rec = copy.deepcopy( orig_rec )
         idx = new_rec.document_metadata_list.index(orig_document)
-        if idx and type(new_document) == DocumentMetadata:
+        if idx!=None and type(new_document) == DocumentMetadata:
             new_rec.document_metadata_list[idx] = new_document
             self.__FilingSet.pop(file_key)
             self.__FilingSet[file_key] = new_rec
