@@ -201,7 +201,11 @@ class Downloader:
                                         )
             return result_doc_dict
         else:
-            return None
+            result = {'new': [],
+                        'previous': previously_loaded,
+                        'fail': []
+                        }
+            return result
 
 
     def get(
