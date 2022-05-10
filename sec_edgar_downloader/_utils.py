@@ -386,17 +386,17 @@ def download_urls(download_folder, filing_storage, list_of_doc_tuples):
 
                 new_doc = doc._replace(FS_Location = save_path)
                 filing_storage.modify_document_in_record(file_key, doc, new_doc)
-                new_doc_list.append(new_doc)            
+                new_doc_list.append( (key, new_doc) )            
                 # Prevent rate limiting
                 print(f'loaded document: {key}')
                 time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)             
             except requests.exceptions.HTTPError as e:  # pragma: no cover
-                fail_doc_list.append(doc)
+                fail_doc_list.append( (key, doc) )
                 print("Skipping full submission download for "
                         f"'{url}' due to network error: {e}."
                         )
         else:
-            previous_doc_list.append(doc)
+            previous_doc_list.append( (key, doc) )
     filing_storage.dump_to_pickle()
     result = {'new': new_doc_list,
                 'previous': previous_doc_list,

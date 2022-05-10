@@ -181,9 +181,13 @@ class Downloader:
         :param filing: filing type to download (e.g. 8-K).
         :param list_of_document_urls: simple urls (e.g. )
         :return: status of download (downloaded -previously, -current, failed to download)
+
+        TODO: a failure is that it does not recognize a specific file type which has nan for Seq
         """
         check_list = []
+        new = []
         previously_loaded = []
+        fail = []
         for doc in list_of_doc_tuples:
             cik, accn, seq = doc[0].split('|')
             key = f'{cik}|{accn}'
@@ -199,13 +203,14 @@ class Downloader:
                                         self.filing_storage, 
                                         check_list
                                         )
-            return result_doc_dict
-        else:
-            result = {'new': [],
-                        'previous': previously_loaded,
-                        'fail': []
-                        }
-            return result
+            self.filing_storage.load_from_pickle()
+            new.extend( result_doc_dict['new'] )
+            previously_loaded.extend( result_doc_dict['previous'] )
+        result = {'new': new,
+                    'previous': previously_loaded,
+                    'fail': fail
+                    }
+        return result
 
 
     def get(

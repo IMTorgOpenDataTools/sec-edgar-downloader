@@ -211,7 +211,8 @@ class FilingStorage:
     
     def sync_with_filesystem(self):
         """Uses the downloaded files to determine correctness of filings' FS_Location.
-        This is useful when the FilingStorage (`self.__FilingSet`) becomes corrupt.
+        This is useful when the FilingStorage (`self.__FilingSet`) becomes corrupt, or
+        when documents are removed without using the FilingStorage.
 
         TODO: add functionality to populate records, if only the downloaded documents are present.
         """
@@ -237,7 +238,12 @@ class FilingStorage:
             for doc in rec[1].document_metadata_list:
                 doc_name = doc.Document.split()[0]
                 if doc_name in downloaded_docs.keys():
-                    new_doc = doc._replace(FS_Location = downloaded_docs[doc_name])
+                    if doc.FS_Location != downloaded_docs[doc_name]:
+                        new_doc = doc._replace(FS_Location = downloaded_docs[doc_name])
+                        self.modify_document_in_record(file_key, doc, new_doc)
+                        cnt += 1
+                else:
+                    new_doc = doc._replace(FS_Location = None)
                     self.modify_document_in_record(file_key, doc, new_doc)
                     cnt += 1
         self.dump_to_pickle()
