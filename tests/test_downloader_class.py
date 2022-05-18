@@ -103,7 +103,7 @@ def test_get_urls():
     num_filings_to_download = 1
 
     dl = Downloader("./Downloads")
-    url_count = dl.get_urls(
+    url_count = dl.get_metadata(
         filing=filing_type,
         ticker_or_cik = ticker,
         amount = num_filings_to_download,

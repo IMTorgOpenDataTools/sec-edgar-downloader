@@ -388,7 +388,7 @@ def download_urls(download_folder, filing_storage, list_of_doc_tuples):
                 filing_storage.modify_document_in_record(file_key, doc, new_doc)
                 new_doc_list.append( (key, new_doc) )            
                 # Prevent rate limiting
-                print(f'loaded document: {key}')
+                print(f'downloaded document: {key}')
                 time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)             
             except requests.exceptions.HTTPError as e:  # pragma: no cover
                 fail_doc_list.append( (key, doc) )

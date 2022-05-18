@@ -112,7 +112,7 @@ class FilingStorage:
             result = [add_rec(record) for record in rec_lst]
             print(f"Added {len(result)} records.")
         elif record == None:
-            print(f"No record(s) provided.")
+            print(f"No record(s) provided to storage.")
             return None
         else:
             raise TypeError
@@ -197,7 +197,7 @@ class FilingStorage:
 
     
     def get_dataframe(self, mode='file'):
-        """Return a dataframe of all records."""
+        """Return a dataframe of all records at the stated level of detail."""
         match mode:
             case 'file':
                 list_of_dicts = [rec.get_file_record() for rec in list(self.__FilingSet.values()) if isinstance(rec.get_file_record(), dict)]
@@ -205,6 +205,8 @@ class FilingStorage:
                 list_of_dicts = []
                 for rec in list(self.__FilingSet.values()):
                     list_of_dicts.extend( rec.get_document_record_list() )
+            case _:
+                print(f'The argument given for `mode`, {mode}, is not available: only `file` and `document`.')
         df = pd.DataFrame(list_of_dicts)
         return df
 

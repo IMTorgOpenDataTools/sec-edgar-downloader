@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import warnings
 
 import requests
 import json
@@ -119,11 +120,12 @@ class Filing:
     _url_filing_detail_page: str = 'https://www.sec.gov/Archives/edgar/data/{}/{}/{}-index.htm'
     _url_filing_document: str = 'https://www.sec.gov/Archives/edgar/data/{}/{}/{}'
 
-    def __init__(self, short_cik:str, accession_number:AccessionNumber, file_type:str = None, file_date:str = None) -> None:
+    def __init__(self, short_cik:str, accession_number:AccessionNumber, file_type:str = None, file_date:str = None, report_date:str = None) -> None:
         self.short_cik = short_cik
         self.accession_number = accession_number
         self.file_type = file_type
         self.file_date = file_date
+        self.report_date = report_date
 
         self.document_metadata_list = []
 
@@ -244,8 +246,10 @@ class Filing:
         #ticker = 
         file_type = soup.find('div', attrs={'class':'companyInfo'}).find(text='Type: ').find_next_sibling('strong').text
         file_date = soup.find('div', text="Filing Date", attrs={'class': 'infoHead'}).find_next_sibling('div', attrs={'class': 'info'}).text
+        report_date = soup.find('div', text="Period of Report", attrs={'class': 'infoHead'}).find_next_sibling('div', attrs={'class': 'info'}).text
         self.file_type = file_type if self.file_type == None else self.file_type
         self.file_date = datetime.strptime(file_date, '%Y-%m-%d') if self.file_date == None else self.file_date
+        self.report_date = datetime.strptime(report_date, '%Y-%m-%d') if self.report_date == None else self.report_date
 
         tbls = soup.find_all('table')
         df = pd.DataFrame()
@@ -318,6 +322,7 @@ class Filing:
         rec = {k:v for k,v in asdict.items() if (k != 'document_metadata_list' and 'url' not in k)}
         rec['file_type'] = self.file_type
         rec['file_date'] = self.file_date
+        rec['report_date'] = self.report_date
         rec['doc_types'] = list(set([doc.Type for doc in asdict['document_metadata_list']]))
         return rec
 
@@ -332,7 +337,8 @@ class Filing:
             rec['accession_number'] = self.accession_number
             rec['file_type'] = self.file_type
             rec['file_date'] = self.file_date
-            rec['yr-month'] = f'{self.file_date.year}-{self.file_date.month}'
+            rec['report_date'] = self.report_date
+            rec['yr-month'] = f'{self.report_date.year}-{self.report_date.month}'
             result.append(rec)
         return result
         
@@ -384,10 +390,10 @@ class Firm():
         else:
             pass
         if self._cik in Firm.__ciks:
-            raise ValueError('firm previously created')
+            warnings.warn('firm previously created')
         elif self._cik == None:
             print(self._name); print(self.ticker)
-            raise ValueError('firm not registered at sec: no cik is found')
+            warnings.warn('firm not registered at sec: no cik is found')
         else:
             Firm.__ciks.add(self._cik)
 

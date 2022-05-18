@@ -94,7 +94,7 @@ class Downloader:
         return url_list
 
 
-    def get_urls(
+    def get_metadata(
         self,
         filing: str,
         ticker_or_cik: str,
@@ -105,7 +105,7 @@ class Downloader:
         include_amends: bool = False,
         query: str = "",
     ) -> int:
-        """Download filings and save them to disk.
+        """Download metadata for filings and save to storage.
 
         :param filing: filing type to download (e.g. 8-K).
         :param ticker_or_cik: ticker or CIK to download filings for.

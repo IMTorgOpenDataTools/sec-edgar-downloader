@@ -63,7 +63,7 @@ def test_filing_get_filing_document_url():
     number = '0001628280-16-020309'
     doc_type = {'xbrl':'xbrl_instance_doc_url'}
     File = uc.Filing(short_cik, uc.AccessionNumber(number) )
-    assert getattr(File.filing_metadata, doc_type['xbrl']) == 'https://www.sec.gov/Archives/edgar/data/320193/000162828016020309/aapl-20160924.xml'
+    assert getattr(File, 'xbrl_instance_doc_url')[0] == 'https://www.sec.gov/Archives/edgar/data/320193/000162828016020309/aapl-20160924.xml'
 
 
 def test_blindly_getting_data():
@@ -99,7 +99,7 @@ def test_get_urls():
     num_filings_to_download = 30
 
     dl = Downloader("./Downloads")
-    result_filing_dict = dl.get_urls(
+    result_filing_dict = dl.get_metadata(
         filing=filing_type,
         ticker_or_cik = ticker,
         amount = num_filings_to_download,
@@ -113,13 +113,17 @@ def test_get_urls():
     staged = dl.filing_storage.get_document_in_record( lst_of_idx )
     result_doc_dict = dl.get_documents_from_url_list(staged)
 
+    available_docs = result_doc_dict['new']
+    available_docs.extend(result_doc_dict['previous'])
+
     #TODO: remove dirs in `./Downloads`
-    assert True == True
+    assert len(available_docs) == 280
 
 
 
 
 
-#test_filing_get_filing_document_url()
+
 #test_specific_number()
+#test_filing_get_filing_document_url()
 test_get_urls()
