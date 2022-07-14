@@ -277,7 +277,8 @@ class Filing:
                             Size=rec.Size,
                             URL=rec.URL,
                             Extension=rec.Extension,
-                            FS_Location=None
+                            FS_Location=None,
+                            Report_date=report_date,
                             ) for rec in tmp_list ]
 
         base_url = 'https://www.sec.gov'

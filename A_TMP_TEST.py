@@ -117,7 +117,7 @@ def test_get_urls():
     available_docs.extend(result_doc_dict['previous'])
 
     #TODO: remove dirs in `./Downloads`
-    assert len(available_docs) == 280
+    assert len(available_docs) == 358
 
 
 
