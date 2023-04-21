@@ -1,9 +1,18 @@
-"""Provides a :class:`Downloader` class for downloading SEC EDGAR filings."""
+#!/usr/bin/env python3
+"""
+The Downloader class for primary object used in downloading SEC EDGAR filings.
+
+Downloader enables extraction of Filings and Document metadata, maintains
+that data in the FilingStorage, and downloads selected data into file system.
+
+Classes:
+    Downloader
+
+"""
 import requests
 import time
 from bs4 import BeautifulSoup
 
-import sys
 from pathlib import Path
 from typing import ClassVar, List, Optional, Union, Dict
 
@@ -27,20 +36,19 @@ from . import FilingStorage as fs
 
 
 class Downloader:
-    """A :class:`Downloader` object.
-
-    :param download_folder: relative or absolute path to download location.
-        Defaults to the current working directory.
+    """Create Downloader object for Filing Documents download and maintenance.
 
     Usage::
-
         >>> from sec_edgar_downloader import Downloader
-
         # Download to current working directory
         >>> dl = Downloader()
-
         # Download to relative or absolute path
         >>> dl = Downloader("/path/to/valid/save/location")
+        >>> dl.download_folder
+
+    _Note_: directory and file creation is performed on instantiation. All
+    modifications to the `dl.download_folder` should be performed using the 
+    `dl` functionality so that the FilingStorage remains in-synch.  
     """
     _url_sec_current_search: Dict[str,str] = {'10-K': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=0&q3=',
                                 '10-Q': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=1&q3=',
@@ -50,7 +58,13 @@ class Downloader:
     supported_filings: ClassVar[List[str]] = sorted(_SUPPORTED_FILINGS)
 
     def __init__(self, download_folder: Union[str, Path, None] = None) -> None:
-        """Constructor for the :class:`Downloader` class."""
+        """Constructor for the class Downloader class.
+
+        :param download_folder - relative or absolute path to download 
+        location. Defaults to the current working directory.  Default 
+        creates `./sec-edgar-filings/filing_storage.pickle`.
+        
+        """
         self.download_folder = None
         self.root_folder = None
         self.filing_storage = None
@@ -78,7 +92,7 @@ class Downloader:
         :param file_type
         :return urls
 
-        Usage::
+        Usage
 
         """
         filled_url = self._url_sec_current_search[file_type]

@@ -13,10 +13,28 @@ from sec_edgar_downloader import Downloader
 from sec_edgar_downloader._constants import SUPPORTED_FILINGS, DATE_FORMAT_TOKENS
 from sec_edgar_downloader._utils import _check_params
 
+def cleanup_directory(dir:str = None) -> bool:
+    def rm_tree(pth):
+        for child in pth.glob('*'):
+            if child.is_file()==True:
+                child.unlink()
+            else: 
+                rm_tree(child)
+        pth.rmdir()
+
+    if dir == Path.cwd():
+        remove_dir: Path = Path(dir) / 'sec-edgar-filings'
+    else:
+        remove_dir: Path = Path(dir)
+    rm_tree(remove_dir)
+    return True
+
+
 
 def test_constructor_no_params():
     dl = Downloader()
     expected = Path.cwd()
+    cleanup_directory(expected)
     assert dl.download_folder == expected
 
 
@@ -24,6 +42,7 @@ def test_constructor_blank_path():
     dl = Downloader("")
     # pathlib treats blank paths as the current working directory
     expected = Path.cwd()
+    cleanup_directory(expected)
     assert dl.download_folder == expected
 
 
@@ -33,18 +52,22 @@ def test_constructor_blank_path():
 def test_constructor_relative_path():
     dl = Downloader("./Downloads")
     expected = Path.cwd() / "Downloads"
+    cleanup_directory(expected)
     assert dl.download_folder == expected
 
 
 def test_constructor_user_path():
     dl = Downloader("~/Downloads")
     expected = Path.home() / "Downloads"
+    cleanup_directory(expected)
     assert dl.download_folder == expected
 
 
 def test_constructor_custom_path():
-    custom_path = Path.home() / "Downloads/SEC/EDGAR/Downloader"
+    pth = Path("Downloads/SEC/EDGAR/Downloader")
+    custom_path = Path.home() / pth
     dl = Downloader(custom_path)
+    cleanup_directory(Path.home() / pth.parts[0])
     assert dl.download_folder == custom_path
 
 
@@ -58,6 +81,7 @@ def test_get_sec_latest_filings():
     FORM_TYPE = '10-K'
     dl = Downloader()
     Url_list = dl.get_sec_latest_filings_detail_page(file_type=FORM_TYPE)
+    cleanup_directory(dl.download_folder)
     assert len(Url_list) > 0
 
 
@@ -81,7 +105,7 @@ def test__check_params():
         before_date,
         include_amends,
     )
-
+    cleanup_directory(dl.download_folder)
     assert (filing == filing_type) and (
             ticker_or_cik == ticker) and (
             amount == num_filings_to_download) and (
@@ -113,5 +137,5 @@ def test_get_urls():
         include_amends=include_amends,
     )
     url_count = len(urls['new']) + len(urls['previous']) - len(urls['fail'])
-
+    cleanup_directory(dl.download_folder)
     assert url_count >= num_filings_to_download

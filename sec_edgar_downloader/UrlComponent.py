@@ -18,13 +18,10 @@ __version__ = "0.1.0"
 __license__ = "MIT"
 
 
-import warnings
-
 import requests
 import json
 import time
 from datetime import datetime
-import gc
 
 from bs4 import BeautifulSoup
 import pandas as pd
