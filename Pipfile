@@ -6,8 +6,21 @@ name = "pypi"
 [packages]
 rapidfuzz = "*"
 ordered-set = "*"
+requests = "*"
+beautifulsoup4 = "*"
+faker = "*"
+pandas = "*"
+plotnine = "*"
+lxml = "*"
 
 [dev-packages]
+sphinx = "*"
+sphinx-autobuild = "*"
+sphinx-autodoc-typehints = "*"
+doc8 = "*"
+pytest = "*"
+pre-commit = "*"
+pytest-cov = "*"
 
 [requires]
 python_version = "3.10"

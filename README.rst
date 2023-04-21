@@ -25,6 +25,11 @@ sec-edgar-downloader
     :alt: Code Style: Black
     :target: https://github.com/python/black
 
+
+
+
+
+
 **sec-edgar-downloader** is a Python package for downloading `company filings <https://en.wikipedia.org/wiki/SEC_filing>`_ from the `SEC EDGAR database <https://www.sec.gov/edgar/searchedgar/companysearch.html>`_.
 Searches can be conducted either by `stock ticker <https://en.wikipedia.org/wiki/Ticker_symbol>`_ or `Central Index Key (CIK) <https://en.wikipedia.org/wiki/Central_Index_Key>`_.
 You can use the `SEC CIK lookup tool <https://www.sec.gov/edgar/searchedgar/cik.htm>`_ if you cannot find an appropriate ticker.
@@ -41,8 +46,78 @@ Install and update this package using `pip <https://pip.pypa.io/en/stable/quicks
 
     $ pip install -U sec-edgar-downloader
 
+
+Development and Testing
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Adjust coverage while developing.  From `tox.ini`, remove any `[pytest] addopts`.  From the commandline, perform the following:
+
+.. code-block:: console
+
+    $ pytest --collect-only --cov-fail-under=5
+
+
+Managed Workflow
+^^^^^^^^^^^^^^^^
+
+The managed workflow allows for fine control over what documents in firm filings are downloaded.  For instance, within the 8-K filing, you typically only want file types of 99.*.  These file types can be manually selected using records from a filtered pandas dataframe.  
+
+By blindly getting all documents within a submission, and not dictating specific selections, you may waste resources in download speeds and file storage space.
+
+Both document metadata and downloaded file locations are maintained by the `dl.filing_storage` file, within the Downloader's directory.
+
+.. code-block:: python
+
+    #config
+    from sec_edgar_downloader import Downloader
+    from sec_edgar_downloader import UrlComponent as uc
+    from sec_edgar_downloader import FilingStorage as fs
+
+    #prepare
+    us_banks = [('JPMorgan Chase','JPM'),('US Bankcorp', 'USB')]
+    banks = [uc.Firm(ticker=bank[1]) for bank in banks]
+    dl = Downloader("./TMP_RESULTS")
+    dl.filing_storage
+
+    #load filing metadata
+    for bank in banks:
+        urls = dl.get_metadata(form = "8-K",
+                                ticker = bank.get_info()['ticker'],
+                                after = "2022-01-01"
+                                )
+    dl.filing_storage
+
+    #select filing metadata for download
+    df = dl.filing_storage.get_dataframe(mode='document')
+    sel1 = df[(df['short_cik'].isin(ciks)) & (df['file_type'] == '8-K') & (df['FS_Location'].isnull())]
+    def check(row):
+        if type(row.Type) == str and ('EX-99.1' in row.Type or 'EX-99.2' in row.Type or 'EX-99.3' in row.Type):
+            return True
+        else:
+            return False
+    mask = sel1.apply(check, axis=1)
+    sel2 = sel1[mask]
+
+    #download
+    lst_of_idx = sel2.index.tolist()
+    staged = dl.filing_storage.get_document_in_record( lst_of_idx )
+    updated = dl.get_documents_from_url_list(staged)
+    multi_str = (f"New docs: {len(updated['new'])}\n"
+                 f"Previous docs: {len(updated['previous'])}\n"
+                 f"Docs failed to download: {len(updated['fail'])}" )
+    print(multi_str)
+    [doc for doc in dl.filing_storage.get_all_records(mode='document').values() 
+        if doc.FS_Location != '']
+
+    #cleanup
+    [obj.unlink() for obj in dl.path? if obj.isfile == True]
+    dl.path.rm_dir
+
+
 Basic Usage
 ^^^^^^^^^^^
+
+The basic usage enables getting all documents in a firm's filing submission.
 
 .. code-block:: python
 
@@ -87,8 +162,11 @@ Basic Usage
     # Get all SD filings for Apple
     dl.get("SD", "AAPL")
 
+
 Advanced Usage
 ^^^^^^^^^^^^^^
+
+Advanced usage includes more arguments to provide finer control without manual selection.
 
 .. code-block:: python
 
