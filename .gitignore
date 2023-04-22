@@ -140,7 +140,7 @@ tags
 # Persistent undo
 [._]*.un~
 
-.vscode
+#.vscode
 .idea
 
 # General

@@ -1,7 +1,6 @@
 """Utility functions for the downloader class."""
 import sys
 import time
-import re
 
 from datetime import datetime
 from pathlib import Path
@@ -14,8 +13,11 @@ from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from FilingStorage import FilingStorage
+
 from ._constants import (
     FilingMetadata,
+    DocumentMetadata,
     #get_number_of_unique_filings,
     generate_random_user_agent,
     is_cik,
@@ -50,6 +52,7 @@ retries = Retry(
 
 
 def validate_date_format(date_format: str) -> None:
+    """Validate user input date formats."""
     error_msg_base = "Please enter a date string of the form YYYY-MM-DD."
 
     if not isinstance(date_format, str):
@@ -68,8 +71,9 @@ def form_request_payload(
     start_date: str,
     end_date: str,
     start_index: int,
-    query: str,
-) -> dict:
+    query: str
+    ) -> dict:
+    """Combine all request arguments for portability."""
     payload = {
         "dateRange": "custom",
         "startdt": start_date,
@@ -83,6 +87,11 @@ def form_request_payload(
 
 
 def build_filing_metadata_from_hit(hit: dict) -> FilingMetadata:
+    """Given a response from Filing url hit, return the associated
+    FilingMetadata.
+    
+    This includes attributes available for all Filings.
+    """
     accession_number, filing_details_filename = hit["_id"].split(":", 1)
     CIK, YY, SEQ = accession_number.split('-')
 
@@ -130,6 +139,10 @@ def build_filing_metadata_from_hit(hit: dict) -> FilingMetadata:
 
 
 def request_standard_url(payload, headers):
+    """Make a request to a standard urls.
+    
+    TODO: replace request logic in classes with this function.
+    """
     client = requests.Session()
     client.mount("http://", HTTPAdapter(max_retries=retries))
     client.mount("https://", HTTPAdapter(max_retries=retries))
@@ -174,6 +187,7 @@ def get_filing_urls_to_download(
     include_amends: bool,
     query: str = "",
 ) -> List[FilingMetadata]:
+    """Create a list of FilingMetadata from requested filings."""
     filings_to_fetch: List[FilingMetadata] = []
     start_index = 0
     """CHECKED """
@@ -233,6 +247,7 @@ def get_filing_urls_to_download(
 
 
 def resolve_relative_urls_in_filing(filing_text: str, download_url: str) -> str:
+    """TODO: whhere to use this?"""
     soup = BeautifulSoup(filing_text, "lxml")
     base_url = f"{download_url.rsplit('/', 1)[0]}/"
 
@@ -342,10 +357,12 @@ def _check_params(
 
 
 
-def download_urls(download_folder, filing_storage, list_of_doc_tuples):
+def download_urls(download_folder: Path, filing_storage: FilingStorage, list_of_doc_tuples: list[DocumentMetadata]) -> dict[str,int]:
     """Download document given only a list of document urls.  Update the File records.
-
-    :param list_of_doc_tuples: these should be in the form of (key, DocumentMetadata), where key is 'cik|acc_no|doc_seq'
+'
+    :param download_folder - path location to download files
+    :param filing_storage - instance of FilingStorage to maintain file location data
+    :param list_of_doc_tuples - these should be in the form of (key, DocumentMetadata), where key is 'cik|acc_no|doc_seq'
     
     """
     base_url = 'https://www.sec.gov'

@@ -1,9 +1,31 @@
+#!/usr/bin/env python3
 """Constants used throughout the package."""
 from datetime import date
 from collections import namedtuple
-from typing import List
 from faker import Faker
 
+
+# Common urls 
+SEC_EDGAR_SEARCH_API_ENDPOINT = "https://efts.sec.gov/LATEST/search-index"
+SEC_EDGAR_ARCHIVES_BASE_URL = "https://www.sec.gov/Archives/edgar/data"
+SEC_EDGAR_CURRENT_SEARCH_BASE_URL = "https://www.sec.gov/cgi-bin"
+
+# SEC limits users to no more than 10 requests per second
+# Sleep 0.1s between each request to prevent rate-limiting
+# Source: https://www.sec.gov/developer
+SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL = 0.1
+
+# Number of times to retry a request to sec.gov
+MAX_RETRIES = 10
+
+DATE_FORMAT_TOKENS = "%Y-%m-%d"
+DEFAULT_BEFORE_DATE = date.today()
+DEFAULT_AFTER_DATE = date(2000, 1, 1)
+
+ROOT_SAVE_FOLDER_NAME = "sec-edgar-filings"
+FILING_FULL_SUBMISSION_FILENAME = "full-submission.txt"
+# Extension will vary based on form (e.g. form 4 is XML, 8-K is HTML)
+FILING_DETAILS_FILENAME_STEM = "filing-details"
 
 
 # Object for storing metadata about filings that will be downloaded.
@@ -26,14 +48,8 @@ FilingMetadata = namedtuple(
         "zip_compressed_file_url"
     ],
 )
-'''
-FilingMetadata = namedtuple(
-    "FilingMetadata",
-    [ 'does_this_get_used'
-    ]
-)'''
 
-
+# Object storing each Filing's multiple Documents.
 DocumentMetadata = namedtuple(
     "DocumentMetadata",
     [
@@ -49,47 +65,20 @@ DocumentMetadata = namedtuple(
     ]
 )
 
-#def get_number_of_unique_filings(filings: List[FilingMetadata]) -> int:
-#    return len({metadata.accession_number for metadata in filings})
 
-# Object for generating fake user-agent strings
 fake = Faker()
 def generate_random_user_agent() -> str:
+    """Generate agent for url requests."""
     return f"{fake.first_name()} {fake.last_name()} {fake.email()}"
 
 def is_cik(ticker_or_cik: str) -> bool:
+    """Determine if string input is a ticker of CIK."""
     try:
         int(ticker_or_cik)
         return True
     except ValueError:
         return False
 
-
-
-
-
-
-
-
-SEC_EDGAR_SEARCH_API_ENDPOINT = "https://efts.sec.gov/LATEST/search-index"
-SEC_EDGAR_ARCHIVES_BASE_URL = "https://www.sec.gov/Archives/edgar/data"
-
-# SEC limits users to no more than 10 requests per second
-# Sleep 0.1s between each request to prevent rate-limiting
-# Source: https://www.sec.gov/developer
-SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL = 0.1
-
-# Number of times to retry a request to sec.gov
-MAX_RETRIES = 10
-
-DATE_FORMAT_TOKENS = "%Y-%m-%d"
-DEFAULT_BEFORE_DATE = date.today()
-DEFAULT_AFTER_DATE = date(2000, 1, 1)
-
-ROOT_SAVE_FOLDER_NAME = "sec-edgar-filings"
-FILING_FULL_SUBMISSION_FILENAME = "full-submission.txt"
-# Extension will vary based on form (e.g. form 4 is XML, 8-K is HTML)
-FILING_DETAILS_FILENAME_STEM = "filing-details"
 
 # Supported filings set to allow for fast validation checks
 SUPPORTED_FILINGS = {

@@ -1,14 +1,11 @@
 import os
 from pathlib import Path
-from re import L
 import copy
 
 import pickle
 import pandas as pd
-from typing import ClassVar, Dict, List, OrderedDict, Set, Optional, Tuple, Union
+from typing import List, OrderedDict
 from collections import OrderedDict
-#from ordered_set import OrderedSet
-from rapidfuzz import process, fuzz
 
 #from ._utils import generate_random_user_agent
 from ._constants import (
@@ -67,6 +64,7 @@ class FilingStorage:
         with open(self.file_path, 'wb') as File:
             pickle.dump(self.__FilingSet, File, protocol=4)
         print('log: updated filing storage')
+        return True
 
 
     def load_from_pickle(self):
@@ -74,6 +72,7 @@ class FilingStorage:
         with open(self.file_path, 'rb') as File:
             self.__FilingSet = pickle.load(File) 
         print(f'log: loaded Filing list from file: {self.file_path}')
+        return True
 
     '''
     def check_record_exists(self,
@@ -90,7 +89,7 @@ class FilingStorage:
         pass'''
 
 
-    def add_record(self, record:uc.Filing = None, rec_lst:List[uc.Filing] = None):
+    def add_record(self, record:uc.Filing = None, rec_lst:list[uc.Filing] = None):
         """Add a single record or a list of records"""
         def add_rec(record):
             key = record.create_key()
@@ -109,7 +108,7 @@ class FilingStorage:
         else:
             raise TypeError
         self.dump_to_pickle()
-        return None
+        return True
 
 
     def get_all_records(self, mode='file'):
@@ -124,7 +123,6 @@ class FilingStorage:
             return dict_of_docs
         else:
             raise TypeError
-        return None
 
     
     def get_record(self, idx_or_key):
@@ -166,7 +164,7 @@ class FilingStorage:
         key = orig_record.create_key()
         self.__FilingSet.pop(key)
         self.__FilingSet[key] = new_record
-        return None
+        return True
 
     
     def modify_document_in_record(self, file_key, orig_document, new_document):
@@ -180,7 +178,7 @@ class FilingStorage:
             self.__FilingSet[file_key] = new_rec
         else:
             raise TypeError
-        return None
+        return True
 
 
     def get_list(self):
@@ -242,7 +240,7 @@ class FilingStorage:
                     cnt += 1
         self.dump_to_pickle()
         print(f'There were {cnt} document FS_Location synced with filesystem')
-        return None
+        return True
 
 
 

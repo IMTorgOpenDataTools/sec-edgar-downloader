@@ -1,0 +1,30 @@
+{
+    "python.terminal.activateEnvironment": false,
+    "python.testing.pytestArgs": [
+        "tests/"
+    ],
+    "python.experiments.optInto": ["All"],
+
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestPath": "/home/vscode/.local/share/virtualenvs/sec-edgar-downloader-R9UGO1MC/bin/pytest",
+    "python.pipenvPath": "/home/vscode/.local/share/virtualenvs/sec-edgar-downloader-R9UGO1MC/bin/python",
+
+
+    "python.linting.pylintPath": "/home/vscode/.local/share/virtualenvs/sec-edgar-downloader-R9UGO1MC/bin/python",
+    "python.autoComplete.extraPaths": ["/home/vscode/.local/share/virtualenvs/sec-edgar-downloader-R9UGO1MC/bin/python"],
+    "python.defaultInterpreterPath": "/home/vscode/.local/share/virtualenvs/sec-edgar-downloader-R9UGO1MC/bin/python",
+    "python.analysis.extraPaths": [
+        "/home/vscode/.local/share/virtualenvs/sec-edgar-downloader-R9UGO1MC/"
+    ],
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/CVS": true,
+        "**/.DS_Store": true,
+        "**/*.pyc": true,
+        "**/__pycache__": true
+    },
+    "esbonio.sphinx.confDir": ""
+}

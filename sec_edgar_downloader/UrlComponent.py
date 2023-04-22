@@ -39,6 +39,7 @@ from ._constants import (
     SEC_EDGAR_ARCHIVES_BASE_URL,
     SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL,
     SEC_EDGAR_SEARCH_API_ENDPOINT,
+    SEC_EDGAR_CURRENT_SEARCH_BASE_URL,
     SUPPORTED_FILINGS
 )
 
@@ -155,10 +156,10 @@ class Filing:
     """
 
     #_url_sec_filing_search: str = "https://www.sec.gov/edgar/search/#/q={}"
-    _url_sec_filing_search: str = "https://efts.sec.gov/LATEST/search-index"
-    _url_company_search: str = "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={}&type={}"
-    _url_filing_detail_page: str = 'https://www.sec.gov/Archives/edgar/data/{}/{}/{}-index.htm'
-    _url_filing_document: str = 'https://www.sec.gov/Archives/edgar/data/{}/{}/{}'
+    _url_sec_filing_search: str = SEC_EDGAR_SEARCH_API_ENDPOINT    #"https://efts.sec.gov/LATEST/search-index"
+    _url_company_search: str = SEC_EDGAR_CURRENT_SEARCH_BASE_URL+'/browse-edgar?action=getcompany&CIK={}&type={}'     "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={}&type={}"
+    _url_filing_detail_page: str = SEC_EDGAR_ARCHIVES_BASE_URL+'/{}/{}/{}-index.htm'   #'https://www.sec.gov/Archives/edgar/data/{}/{}/{}-index.htm'
+    _url_filing_document: str =  SEC_EDGAR_ARCHIVES_BASE_URL+'/{}/{}/{}'    #'https://www.sec.gov/Archives/edgar/data/{}/{}/{}'
 
     def __init__(self, accession_number:AccessionNumber = None, short_cik:str = None, file_type:str = None, file_date:str = None) -> None:
         """Create an object of type Filing from the accession_number for the file details.

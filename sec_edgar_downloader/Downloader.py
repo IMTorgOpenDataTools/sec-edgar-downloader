@@ -16,7 +16,7 @@ from bs4 import BeautifulSoup
 from pathlib import Path
 from typing import ClassVar, List, Optional, Union, Dict
 
-from ._constants import DATE_FORMAT_TOKENS, DEFAULT_AFTER_DATE, DEFAULT_BEFORE_DATE, SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL, ROOT_SAVE_FOLDER_NAME
+from ._constants import SEC_EDGAR_CURRENT_SEARCH_BASE_URL, DATE_FORMAT_TOKENS, DEFAULT_AFTER_DATE, DEFAULT_BEFORE_DATE, SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL, ROOT_SAVE_FOLDER_NAME
 from ._constants import SUPPORTED_FILINGS as _SUPPORTED_FILINGS
 from ._utils import (
     download_urls,
@@ -50,10 +50,10 @@ class Downloader:
     modifications to the `dl.download_folder` should be performed using the 
     `dl` functionality so that the FilingStorage remains in-synch.  
     """
-    _url_sec_current_search: Dict[str,str] = {'10-K': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=0&q3=',
-                                '10-Q': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=1&q3=',
-                                '8-K': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=4&q3=',
-                                'all': 'https://www.sec.gov/cgi-bin/current?q1=0&q2=6&q3='
+    _url_sec_current_search: Dict[str,str] = {'10-K': SEC_EDGAR_CURRENT_SEARCH_BASE_URL+'/current?q1=0&q2=0&q3=',
+                                '10-Q': SEC_EDGAR_CURRENT_SEARCH_BASE_URL+'/current?q1=0&q2=1&q3=',
+                                '8-K': SEC_EDGAR_CURRENT_SEARCH_BASE_URL+'/current?q1=0&q2=4&q3=',
+                                'all': SEC_EDGAR_CURRENT_SEARCH_BASE_URL+'/current?q1=0&q2=6&q3='
                                 }
     supported_filings: ClassVar[List[str]] = sorted(_SUPPORTED_FILINGS)
 
